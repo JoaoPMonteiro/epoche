@@ -25,11 +25,11 @@ def get_yolox_from_mmdet():
     url_config_2 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/_base_/default_runtime.py'
     url_config_3 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/_base_/schedules/schedule_1x.py'
 
-    path_pth = '../methods/YOLOX/pth_files'
+    path_pth = 'methods/YOLOX/pth_files'
     if not os.path.isdir(path_pth):
         os.makedirs(path_pth)
 
-    path_config = '../methods/YOLOX/config_files'
+    path_config = 'methods/YOLOX/config_files'
     if not os.path.isdir(path_config):
         os.makedirs(path_config)
 
@@ -71,11 +71,11 @@ def get_hrnet_from_mmpose():
     url_config_0 = 'https://raw.githubusercontent.com/open-mmlab/mmpose/dca589a0388530d4e387d1200744ad35dd30768d/configs/body/2d_kpt_sview_rgb_img/topdown_heatmap/mpii/hrnet_w32_mpii_256x256.py'
     url_config_1 = 'https://raw.githubusercontent.com/open-mmlab/mmpose/dca589a0388530d4e387d1200744ad35dd30768d/configs/_base_/datasets/mpii.py'
 
-    path_pth = '../methods/HRNET/pth_files'
+    path_pth = 'methods/HRNET/pth_files'
     if not os.path.isdir(path_pth):
         os.makedirs(path_pth)
 
-    path_config = '../methods/HRNET/config_files'
+    path_config = 'methods/HRNET/config_files'
     if not os.path.isdir(path_config):
         os.makedirs(path_config)
 
@@ -115,14 +115,14 @@ def get_poseaug_from_authorsgit():
     url_stgcn = 'https://drive.google.com/drive/folders/1nLrem6QrH_VEZQiYYa05_zM2v3SxGGek'
     url_videopose = 'https://drive.google.com/drive/folders/12QG1qhSqTPw7qHQyNXaKXpoebg99buxI'
 
-    path_pth_0_0 = '../methods/GCN/POSEAUG/pth_files'
-    path_pth_0_1 = '../methods/STGCN/POSEAUG/pth_files'
-    path_pth_0_2 = '../methods/SBL/POSEAUG/pth_files'
-    path_pth_0_3 = '../methods/VPOSE/POSEAUG/pth_files'
-    path_pth_1 = '../methods/GCN/pth_files'
-    path_pth_2 = '../methods/STGCN/pth_files'
-    path_pth_3 = '../methods/SBL/pth_files'
-    path_pth_4 = '../methods/VPOSE/pth_files'
+    path_pth_0_0 = 'methods/GCN/POSEAUG/pth_files'
+    path_pth_0_1 = 'methods/STGCN/POSEAUG/pth_files'
+    path_pth_0_2 = 'methods/SBL/POSEAUG/pth_files'
+    path_pth_0_3 = 'methods/VPOSE/POSEAUG/pth_files'
+    path_pth_1 = 'methods/GCN/pth_files'
+    path_pth_2 = 'methods/STGCN/pth_files'
+    path_pth_3 = 'methods/SBL/pth_files'
+    path_pth_4 = 'methods/VPOSE/pth_files'
 
     if not os.path.isdir(path_pth_0_0):
         os.makedirs(path_pth_0_0)
@@ -164,10 +164,10 @@ def get_poseaug_from_authorsgit():
     gdown.download_folder(url_videopose, output=path_pth_4, quiet=True)
     print('\ndone')
 
-    path_pth_5 = '../methods/GCN/config_files'
-    path_pth_6 = '../methods/STGCN/config_files'
-    path_pth_7 = '../methods/SBL/config_files'
-    path_pth_8 = '../methods/VPOSE/config_files'
+    path_pth_5 = 'methods/GCN/config_files'
+    path_pth_6 = 'methods/STGCN/config_files'
+    path_pth_7 = 'methods/SBL/config_files'
+    path_pth_8 = 'methods/VPOSE/config_files'
 
     if not os.path.isdir(path_pth_5):
         os.makedirs(path_pth_5)
@@ -238,7 +238,7 @@ def get_blazepose_from_mediapipe():
     url_heavy = 'https://github.com/google/mediapipe/raw/v0.8.' + vvv + '/mediapipe/modules/pose_landmark/pose_landmark_heavy.tflite'
     url_lite = 'https://github.com/google/mediapipe/raw/v0.8.' + vvv + '/mediapipe/modules/pose_landmark/pose_landmark_lite.tflite'
 
-    path_tflite = '../methods/BLAZEPOSE/tflite_files'
+    path_tflite = 'methods/BLAZEPOSE/tflite_files'
 
     if not os.path.isdir(path_tflite):
         os.makedirs(path_tflite)

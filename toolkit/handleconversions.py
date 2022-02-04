@@ -36,7 +36,7 @@ def process_blazepose():
     # tflite to onnx
     import tf2onnx
 
-    path_onnx = '../methods/BLAZEPOSE/onnx_files'
+    path_onnx = 'methods/BLAZEPOSE/onnx_files'
 
     if not os.path.isdir(path_onnx):
         os.makedirs(path_onnx)
@@ -48,11 +48,11 @@ def process_blazepose():
         model_proto = g.make_model('test')
         tf2onnx.utils.save_protobuf(out_m, model_proto)
 
-    landmark_in_full = '../methods/BLAZEPOSE/tflite_files/pose_landmark_full_v08' + vvv + '.tflite'
+    landmark_in_full = 'methods/BLAZEPOSE/tflite_files/pose_landmark_full_v08' + vvv + '.tflite'
     landmark_onnx_full = path.join(path_onnx, 'pose_landmark_full_v08' + vvv + '.onnx')
-    landmark_in_heavy = '../methods/BLAZEPOSE/tflite_files/pose_landmark_heavy_v08' + vvv + '.tflite'
+    landmark_in_heavy = 'methods/BLAZEPOSE/tflite_files/pose_landmark_heavy_v08' + vvv + '.tflite'
     landmark_onnx_heavy = path.join(path_onnx, 'pose_landmark_heavy_v08' + vvv + '.onnx')
-    landmark_in_lite = '../methods/BLAZEPOSE/tflite_files/pose_landmark_lite_v08' + vvv + '.tflite'
+    landmark_in_lite = 'methods/BLAZEPOSE/tflite_files/pose_landmark_lite_v08' + vvv + '.tflite'
     landmark_onnx_lite = path.join(path_onnx, 'pose_landmark_lite_v08' + vvv + '.onnx')
 
     export_tflite_to_onnx(landmark_in_full, landmark_onnx_full)
@@ -77,7 +77,7 @@ def process_blazepose():
             shaves=number_shaves,
         )
 
-    path_blob = '../methods/BLAZEPOSE/blob_files'
+    path_blob = 'methods/BLAZEPOSE/blob_files'
 
     if not os.path.isdir(path_blob):
         os.makedirs(path_blob)
@@ -94,19 +94,19 @@ def process_yolox():
     # ------------------------------------------------------------------------------------------------------
     # pytorch to onnx
 
-    path_onnx = '../methods/YOLOX/onnx_files'
+    path_onnx = 'methods/YOLOX/onnx_files'
 
     if not os.path.isdir(path_onnx):
         os.makedirs(path_onnx)
 
-    path_blob = '../methods/YOLOX/blob_files'
+    path_blob = 'methods/YOLOX/blob_files'
 
     if not os.path.isdir(path_blob):
         os.makedirs(path_blob)
 
-    in_chckpnt = '../methods/YOLOX/pth_files/yolox_tiny_8x8_300e_coco.pth'
-    in_cnfg = '../methods/YOLOX/config_files/yolox_tiny_8x8_300e_coco.py'
-    output_file = '../methods/YOLOX/onnx_files/yolox_tiny_8x8_300e_coco.onnx'
+    in_chckpnt = 'methods/YOLOX/pth_files/yolox_tiny_8x8_300e_coco.pth'
+    in_cnfg = 'methods/YOLOX/config_files/yolox_tiny_8x8_300e_coco.py'
+    output_file = 'methods/YOLOX/onnx_files/yolox_tiny_8x8_300e_coco.onnx'
 
     model = init_detector(in_cnfg, in_chckpnt, device='cpu')
 
@@ -151,19 +151,19 @@ def process_hrnet():
     # ------------------------------------------------------------------------------------------------------
     # pytorch to onnx
 
-    path_onnx = '../methods/HRNET/onnx_files'
+    path_onnx = 'methods/HRNET/onnx_files'
 
     if not os.path.isdir(path_onnx):
         os.makedirs(path_onnx)
 
-    path_blob = '../methods/HRNET/blob_files'
+    path_blob = 'methods/HRNET/blob_files'
 
     if not os.path.isdir(path_blob):
         os.makedirs(path_blob)
 
-    in_chckpnt = '../methods/HRNET/pth_files/hrnet_w32_mpii_256x256.pth'
-    in_cnfg = '../methods/HRNET/config_files/hrnet_w32_mpii_256x256.py'
-    output_file = '../methods/HRNET/onnx_files/hrnet_w32_mpii_256x256.onnx'
+    in_chckpnt = 'methods/HRNET/pth_files/hrnet_w32_mpii_256x256.pth'
+    in_cnfg = 'methods/HRNET/config_files/hrnet_w32_mpii_256x256.py'
+    output_file = 'methods/HRNET/onnx_files/hrnet_w32_mpii_256x256.onnx'
 
     model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
     model.forward = model.forward_dummy
@@ -203,19 +203,19 @@ def process_hrnet():
 def process_method(in_method, optional=None):
     if optional is None:
         x_c = in_method.upper()
-        path_onnx = '../methods/' + x_c + '/onnx_files'
+        path_onnx = 'methods/' + x_c + '/onnx_files'
         if not os.path.isdir(path_onnx):
             os.makedirs(path_onnx)
-        path_blob = '../methods/' + x_c + '/blob_files'
+        path_blob = 'methods/' + x_c + '/blob_files'
         if not os.path.isdir(path_blob):
             os.makedirs(path_blob)
     else:
         x_c = in_method.upper()
         s_c = optional.upper()
-        path_onnx = '../methods/' + x_c + '/' + s_c + '/onnx_files'
+        path_onnx = 'methods/' + x_c + '/' + s_c + '/onnx_files'
         if not os.path.isdir(path_onnx):
             os.makedirs(path_onnx)
-        path_blob = '../methods/' + x_c + '/' + s_c + '/blob_files'
+        path_blob = 'methods/' + x_c + '/' + s_c + '/blob_files'
         if not os.path.isdir(path_blob):
             os.makedirs(path_blob)
 
