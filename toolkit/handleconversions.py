@@ -324,7 +324,10 @@ def process_method(in_method, optional=None):
 
         in_method = optional + in_method
 
-    import handleestimation
+    try:
+        import toolkit.handleestimation as handleestimation
+    except:
+        import handleestimation
     with torch.no_grad():
         p_l = handleestimation.PoseLifting(method=in_method, architecture='pytorch')
         model_pos = p_l.get_model()

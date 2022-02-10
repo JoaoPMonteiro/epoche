@@ -1,12 +1,13 @@
 #
-import methodspaths
 import torch
 import importlib
+import numpy as np
+import sys
+sys.path.append('./')
+
 
 # ----------------------------------------------------------------------------------------------
 # //////////////////////////////////////////////////////////////////////////////////////////////
-#import sys
-#sys.path.append('./')
 try:
     import toolkit.customsnippets as customsnippets
 except:
@@ -15,6 +16,55 @@ try:
     import toolkit.methodspaths as methodspaths
 except:
     import methodspaths
+try:
+    import toolkit.handledetection as handledetection
+except:
+    import handledetection
+
+class PosePipeline:
+    def __init__(self, method='blazepose_lite', architecture='tflite', detector='none'):
+        self._methods_pool = ['blazepose_lite',
+                              'blazepose_full',
+                              'blazepose_heavy',
+                              'hrnet_vpose',
+                              'hrnet_sbl',
+                              'hrnet_gcn',
+                              'hrnet_stgcn',
+                              'hrnet_poseaugvpose',
+                              'hrnet_poseaugsbl',
+                              'hrnet_poseauggcn',
+                              'hrnet_poseaugstgcn']
+        self._architecture_pool = ['tflite', 'pytorch', 'onnx']
+        self._det_pool = ['none', 'yolox']
+        self._method = method
+        self._architecture = architecture
+        self._detector = detector
+        self._setup()
+
+    def _setup(self):
+        mthd_ok = any(self._method == word for word in self._methods_pool)
+        rchtctr_ok = any(self._architecture == word for word in self._architecture_pool)
+        dt_ok = any(self._detector == word for word in self._det_pool)
+
+        if mthd_ok and rchtctr_ok and dt_ok:
+            if self._detector == 'none':
+                self.det_d = False
+            elif self._detector == 'yolox':
+                self.det_d = True
+                self.detectorClass = handledetection.PoseDetection(method=self._detector,
+                                                                   architecture=self._architecture)
+            else:
+                raise TypeError('method or architecture not valid')
+            pass
+        else:
+            raise TypeError('method or architecture not valid')
+
+    def estimate(self, in_img):
+        if self.det_d:
+            outbb = self.detectorClass(in_img)
+        else:
+            outbb = np.array([0.0, 0.0, in_img.shape[0], in_img.shape[1], 1.0])
+        return outbb
 
 
 class PoseEstimation:
@@ -195,13 +245,11 @@ class PoseLifting:
     def _vpose(self):
         l_paths = self._paths
         evaluate = l_paths.pth
+
         x = l_paths.cfg
         x = x.replace('../', '')
         x = x.replace('/', '.')
         x = x.replace('.py', '')
-        import sys
-
-        sys.path.append('..')
 
         TemporalModelOptimized1f = getattr(importlib.import_module(x), 'TemporalModelOptimized1f')
         stages = 4
