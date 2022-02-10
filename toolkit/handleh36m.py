@@ -2,6 +2,7 @@ from os import path
 from tqdm import tqdm
 import h5py
 import cv2
+import configparser
 
 # ///////////////////////////////////////////////////////////////////////////////////////////
 # (adapted from) https://github.com/anibali/h36m-fetch
@@ -115,6 +116,76 @@ def explore_test_data(src_dir):
             assortedroutines.another_3d_plot(p_annot3)
 
             wally = 'here'
+
+
+class H36M_walker:
+    def __init__(self):
+        self._setup()
+
+    def _setup(self):
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+        self.src_dir = config['General']['PATHTOH36MFOLDER']
+
+        self.h36m_metadata = load_h36m_metadata(self.src_dir)
+        sequence_mappings = self.h36m_metadata.sequence_mappings
+        test_subjects = {
+            'S9': 9,
+            'S11': 11
+        }
+
+        self.subactions = []
+        for subject in test_subjects.keys():
+            self.subactions += [
+                (subject, action, subaction)
+                for action, subaction in sequence_mappings[subject].keys()
+                if int(action) > 1  # Exclude '_ALL'
+            ]
+
+        self.outer_iter = self.subactions
+        self.outer_pos = 0
+        self.outer_last = len(self.outer_iter)
+        self._prepare_inner_iter_from_pos(self.outer_pos)
+
+    def _prepare_inner_iter_from_pos(self, probe_index):
+        subject, action, subaction = self.outer_iter[probe_index]
+        out_dir_r = path.join('processed', subject, self.h36m_metadata.action_names[action] + '-' + subaction)
+        self.out_dir = path.join(self.src_dir, out_dir_r)
+        f = h5py.File(path.join(self.out_dir, 'annot.h5'), 'r')
+        self.poses_3d = f['pose']['3d']
+        self.poses_3d_univ = f['pose']['3d-univ']
+        self.poses_2d = f['pose']['2d']
+        self.frames = f['frame']
+        self.cam_id = f['camera']
+
+        self.inner_pos = 0
+        self.inner_last = len(self.frames)
+
+    def get_next(self):
+        j = self.frames[self.inner_pos]
+        c_cam = str(self.cam_id[self.inner_pos])
+        filename = 'img_%06d.jpg' % j
+        print(filename)
+        ref_path = path.join(self.out_dir, 'imageSequence')
+        cam_path = path.join(ref_path, c_cam)
+        img_path = path.join(cam_path, filename)
+
+        image = cv2.imread(img_path)
+        annot2 = self.poses_2d[self.inner_pos]
+        annot3 = self.poses_3d[self.inner_pos]
+        p_annot2 = preprocess2d_h36m(annot2)
+        p_annot3 = preprocess3d_h36m(annot3)
+
+        self.inner_pos += 1
+
+        if self.inner_pos == self.inner_last:
+            self.outer_pos += 1
+            if self.outer_pos == self.outer_last:
+                return -1, -1, -1
+            else:
+                self._prepare_inner_iter_from_pos(self.outer_pos)
+
+        return image, p_annot2, p_annot3
 
 
 # ----------------------------------------------------------------------------------------------

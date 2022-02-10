@@ -5,7 +5,10 @@ import blobconverter
 import torch
 import onnxruntime
 import numpy as np
-import methodspaths
+try:
+    import toolkit.methodspaths as methodspaths
+except:
+    import methodspaths
 
 
 number_shaves = 4
@@ -86,10 +89,78 @@ def process_blazepose():
     export_onnx_blob(landmark_onnx_heavy, path_blob)
     export_onnx_blob(landmark_onnx_lite, path_blob)
 
+'''
+def process_yolox_decode():
+    try:
+        import toolkit.customsnippets as customsnippets
+    except:
+        import customsnippets
+    from onnx_tf.backend import prepare
+    import tensorflow as tf
+    import onnx
+
+    path_tflite = 'methods/YOLOX/tflite_files'
+    if not os.path.isdir(path_tflite):
+        os.makedirs(path_tflite)
+    path_blob = 'methods/YOLOX/blob_files'
+    if not os.path.isdir(path_blob):
+        os.makedirs(path_blob)
+
+    # yolox post process
+    decodeBB = customsnippets.GetPoseDetectionBBNN()
+    decodeBB.eval()
+    anotherinput_a = torch.zeros(1, 8390, 85)
+    anotherinput_b = torch.rand(1, 10, 85)
+    anotherinput = torch.cat((anotherinput_b, anotherinput_a), 1)
+    output_decode = 'methods/YOLOX/onnx_files/decodeBB.onnx'
+    pytorch_resultsbb = decodeBB(anotherinput)
+
+    torch.onnx.export(
+        decodeBB,
+        anotherinput,
+        output_decode,
+        opset_version=11,
+        do_constant_folding=False,
+        verbose=True,
+        output_names=['input_1']
+    )
+
+    check_onnx_(pytorch_resultsbb.detach().cpu(), output_decode, anotherinput.detach().cpu().numpy())
+
+    blob_path = blobconverter.from_onnx(
+        model=output_decode,
+        optimizer_params=[
+            "--data_type=FP16",
+        ],
+        compile_params=[
+            "-ip fp16 -op fp16"
+        ],
+        output_dir=path_blob,
+        shaves=number_shaves,
+    )
+
+    onnx_decode_model = onnx.load(output_decode)
+    path_tflite_decode = 'methods/YOLOX/tflite_files/decode'
+    if not os.path.isdir(path_tflite_decode):
+        os.makedirs(path_tflite_decode)
+
+    db_tf_rep = prepare(onnx_decode_model)
+    db_tf_rep.export_graph(path_tflite_decode)
+    converter = tf.lite.TFLiteConverter.from_saved_model(path_tflite_decode)
+    tflite_model = converter.convert()
+
+    tflite_model_path = path.join(path_tflite, 'decodeBB.tflite')
+    # Save the model
+    with open(tflite_model_path, 'wb') as f:
+        f.write(tflite_model)
+'''
 
 def process_yolox():
     from mmdet.apis import init_detector
-    import customsnippets
+    try:
+        import toolkit.customsnippets as customsnippets
+    except:
+        import customsnippets
 
     # ------------------------------------------------------------------------------------------------------
     # pytorch to onnx
@@ -104,18 +175,18 @@ def process_yolox():
     if not os.path.isdir(path_blob):
         os.makedirs(path_blob)
 
-    in_chckpnt = 'methods/YOLOX/pth_files/yolox_tiny_8x8_300e_coco.pth'
-    in_cnfg = 'methods/YOLOX/config_files/yolox_tiny_8x8_300e_coco.py'
-    output_file = 'methods/YOLOX/onnx_files/yolox_tiny_8x8_300e_coco.onnx'
+    in_chckpnt = 'methods/YOLOX/pth_files/yolox_s_8x8_300e_coco.pth'
+    in_cnfg = 'methods/YOLOX/config_files/yolox_s_8x8_300e_coco.py'
+    output_file = 'methods/YOLOX/onnx_files/yolox_s_8x8_300e_coco.onnx'
 
     model = init_detector(in_cnfg, in_chckpnt, device='cpu')
 
     with torch.no_grad():
 
         custom_yolox = customsnippets.build_custom_yolox_from_model(model)
-        custom_yolox.forward = custom_yolox.customforward
-        custom_yolox.cpu().eval()
+
         one_img = torch.randn([1, 3, 640, 640], requires_grad=False)
+
         pytorch_results = custom_yolox(one_img)
 
         torch.onnx.export(
@@ -143,6 +214,38 @@ def process_yolox():
         output_dir=path_blob,
         shaves=number_shaves,
     )
+
+    # --------------------------------------------------------------------------------------------------------
+    #https://github.com/sithu31296/PyTorch-ONNX-TFLite
+    path_tflite = 'methods/YOLOX/tflite_files'
+
+    if not os.path.isdir(path_tflite):
+        os.makedirs(path_tflite)
+
+    path_tf = 'methods/YOLOX/tflite_files/model'
+
+    if not os.path.isdir(path_tf):
+        os.makedirs(path_tf)
+
+    import onnx
+
+    onnx_model = onnx.load(output_file)
+
+    from onnx_tf.backend import prepare
+    import tensorflow as tf
+
+    tf_rep = prepare(onnx_model)
+    tf_rep.export_graph(path_tf)
+    converter = tf.lite.TFLiteConverter.from_saved_model(path_tf)
+    tflite_model = converter.convert()
+
+    tflite_model_path = path.join(path_tflite, 'yolox_s_8x8_300e_coco.tflite')
+    # Save the model
+    with open(tflite_model_path, 'wb') as f:
+        f.write(tflite_model)
+
+    # --------------------------------------------------------------------------------------------------------
+    #process_yolox_decode()
 
 
 def process_hrnet():

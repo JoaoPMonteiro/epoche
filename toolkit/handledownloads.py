@@ -19,9 +19,10 @@ def inplace_change(filename, old_string, new_string):
 
 
 def get_yolox_from_mmdet():
-    url_pth = 'https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth'
+    #url_pth = 'https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_tiny_8x8_300e_coco/yolox_tiny_8x8_300e_coco_20211124_171234-b4047906.pth'
+    url_pth = 'https://download.openmmlab.com/mmdetection/v2.0/yolox/yolox_s_8x8_300e_coco/yolox_s_8x8_300e_coco_20211121_095711-4592a793.pth'
     url_config_0 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/yolox/yolox_s_8x8_300e_coco.py'
-    url_config_1 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/yolox/yolox_tiny_8x8_300e_coco.py'
+    #url_config_1 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/yolox/yolox_tiny_8x8_300e_coco.py'
     url_config_2 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/_base_/default_runtime.py'
     url_config_3 = 'https://raw.githubusercontent.com/open-mmlab/mmdetection/f08548bfd6d394a82566022709b5ce9e6b0a855e/configs/_base_/schedules/schedule_1x.py'
 
@@ -33,15 +34,15 @@ def get_yolox_from_mmdet():
     if not os.path.isdir(path_config):
         os.makedirs(path_config)
 
-    filename_pth = 'yolox_tiny_8x8_300e_coco.pth'
+    filename_pth = 'yolox_s_8x8_300e_coco.pth'
     filename_config_0 = 'yolox_s_8x8_300e_coco.py'
-    filename_config_1 = 'yolox_tiny_8x8_300e_coco.py'
+    #filename_config_1 = 'yolox_tiny_8x8_300e_coco.py'
     filename_config_2 = 'default_runtime.py'
     filename_config_3 = 'schedule_1x.py'
 
     out_pth = path.join(path_pth, filename_pth)
     out_config_0 = path.join(path_config, filename_config_0)
-    out_config_1 = path.join(path_config, filename_config_1)
+    #out_config_1 = path.join(path_config, filename_config_1)
     out_config_2 = path.join(path_config, filename_config_2)
     out_config_3 = path.join(path_config, filename_config_3)
 
@@ -51,9 +52,9 @@ def get_yolox_from_mmdet():
     print('downloading ' + filename_config_0 + '...')
     wget.download(url_config_0, out_config_0)
     print('\ndone')
-    print('downloading ' + filename_config_1 + '...')
-    wget.download(url_config_1, out_config_1)
-    print('\ndone')
+    #print('downloading ' + filename_config_1 + '...')
+    #wget.download(url_config_1, out_config_1)
+    #print('\ndone')
     print('downloading ' + filename_config_2 + '...')
     wget.download(url_config_2, out_config_2)
     print('\ndone')

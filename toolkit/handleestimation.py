@@ -5,10 +5,16 @@ import importlib
 
 # ----------------------------------------------------------------------------------------------
 # //////////////////////////////////////////////////////////////////////////////////////////////
-import sys
-sys.path.append('./')
-import toolkit.methodspaths
-import customsnippets
+#import sys
+#sys.path.append('./')
+try:
+    import toolkit.customsnippets as customsnippets
+except:
+    import customsnippets
+try:
+    import toolkit.methodspaths as methodspaths
+except:
+    import methodspaths
 
 
 class PoseEstimation:
@@ -24,7 +30,7 @@ class PoseEstimation:
                               'hrnet_poseaugsbl',
                               'hrnet_poseauggcn',
                               'hrnet_poseaugstgcn']
-        self._architecture_pool = ['tflite', 'pytorch', 'onnx', 'vpu']
+        self._architecture_pool = ['tflite', 'pytorch', 'onnx']
         self._cheatsheet = {'blazepose_lite': 0,
                             'blazepose_full': 0,
                             'blazepose_heavy': 0,
@@ -71,7 +77,7 @@ class PoseEstimation:
 class PoseEstimation2D:
     def __init__(self, method='hrnet', architecture='pytorch'):
         self._methods_pool = ['hrnet']
-        self._architecture_pool = ['pytorch', 'onnx', 'vpu']
+        self._architecture_pool = ['pytorch', 'onnx']
         self._method = method
         self._architecture = architecture
         self._setup()
@@ -107,7 +113,7 @@ class PoseLifting:
                               'poseaugsbl',
                               'poseauggcn',
                               'poseaugstgcn']
-        self._architecture_pool = ['pytorch', 'onnx', 'vpu']
+        self._architecture_pool = ['pytorch', 'onnx']
         self._cheatsheet = {'vpose': 0,
                             'sbl': 0,
                             'gcn': 0,
@@ -206,7 +212,7 @@ class PoseLifting:
         model_1 = TemporalModelOptimized1f(16, 2, 15, filter_widths=filter_widths, causal=False, dropout=0.25,
                                            channels=1024)
 
-        x2 = toolkit.methodspaths.methodsDict['sbl_Paths'].cfg
+        x2 = methodspaths.methodsDict['sbl_Paths'].cfg
         x2 = x2.replace('../', '')
         x2 = x2.replace('/', '.')
         x2 = x2.replace('.py', '')
@@ -228,7 +234,7 @@ class PoseLifting:
         l_paths = self._paths
         evaluate = l_paths.pth
 
-        x2 = toolkit.methodspaths.methodsDict['sbl_Paths'].cfg
+        x2 = methodspaths.methodsDict['sbl_Paths'].cfg
         x2 = x2.replace('../', '')
         x2 = x2.replace('/', '.')
         x2 = x2.replace('.py', '')
@@ -286,7 +292,7 @@ class PoseLifting:
         l_paths = self._paths
         evaluate = l_paths.pth
 
-        x2 = toolkit.methodspaths.methodsDict['sbl_Paths'].cfg
+        x2 = methodspaths.methodsDict['sbl_Paths'].cfg
         x2 = x2.replace('../', '')
         x2 = x2.replace('/', '.')
         x2 = x2.replace('.py', '')
@@ -331,7 +337,7 @@ class SingleStage3D:
         self._methods_pool = ['blazepose_lite',
                               'blazepose_full',
                               'blazepose_heavy']
-        self._architecture_pool = ['tflite', 'onnx', 'vpu']
+        self._architecture_pool = ['tflite', 'onnx']
         self._method = method
         self._architecture = architecture
         self._setup()
