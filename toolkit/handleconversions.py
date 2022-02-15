@@ -5,10 +5,16 @@ import blobconverter
 import torch
 import onnxruntime
 import numpy as np
+
 try:
     import toolkit.methodspaths as methodspaths
 except:
     import methodspaths
+
+try:
+    import toolkit.customsnippets as customsnippets
+except:
+    import customsnippets
 
 
 number_shaves = 4
@@ -34,7 +40,7 @@ def check_onnx_(ref_output, path_to_onnx, probe_img):
 
 
 def process_blazepose():
-    vvv = '4'
+    vvv = '9'
     # ------------------------------------------------------------------------------------------------------
     # tflite to onnx
     import tf2onnx
@@ -155,12 +161,10 @@ def process_yolox_decode():
         f.write(tflite_model)
 '''
 
+
 def process_yolox():
     from mmdet.apis import init_detector
-    try:
-        import toolkit.customsnippets as customsnippets
-    except:
-        import customsnippets
+
 
     # ------------------------------------------------------------------------------------------------------
     # pytorch to onnx
@@ -268,8 +272,9 @@ def process_hrnet():
     in_cnfg = 'methods/HRNET/config_files/hrnet_w32_mpii_256x256.py'
     output_file = 'methods/HRNET/onnx_files/hrnet_w32_mpii_256x256.onnx'
 
-    model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
-    model.forward = model.forward_dummy
+    #model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
+    #model.forward = model.forward_dummy
+    model = customsnippets.build_custom_hrnet()
 
     model.cpu().eval()
 

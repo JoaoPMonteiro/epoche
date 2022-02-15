@@ -14,8 +14,10 @@ except:
     import methodspaths
 
 
+hardcodedsize = (640, 640)  # yolox specific
+
 def preprocess_img(in_img):
-    hardcodedsize = (640, 640)
+    #hardcodedsize = (640, 640)
     probe_img = cv2.resize(in_img, hardcodedsize, cv2.INTER_AREA)
     probe_img = np.moveaxis(probe_img, [0, 1, 2], [2, 1, 0])
     probe_img = np.moveaxis(probe_img, [0, 1, 2], [0, 2, 1])
@@ -27,7 +29,7 @@ def preprocess_img(in_img):
 # //////////////////////////////////////////////////////////////////////////////////////////////
 class PoseDetection:
     def __init__(self, method='yolox', architecture='pytorch'):
-        self._methods_pool = ['yolox']
+        self._methods_pool = ['yolox', 'none']
         self._architecture_pool = ['tflite', 'pytorch', 'onnx']
         self._cheatsheet = {'tflite': 0,
                             'pytorch': 1,
@@ -41,23 +43,38 @@ class PoseDetection:
         rchtctr_ok = any(self._architecture == word for word in self._architecture_pool)
 
         if mthd_ok and rchtctr_ok:
-            if self._cheatsheet[self._architecture] == 0:
-                self.detector = YoloxDetectionTFLITE()
-            elif self._cheatsheet[self._architecture] == 1:
-                self.detector = YoloxDetectionPytorch()
-            elif self._cheatsheet[self._architecture] == 2:
-                self.detector = YoloxDetectionONNX()
+            if self._method == 'none':
+                self.detector = DummyDetector()
             else:
-                raise TypeError('not yet')
+                if self._cheatsheet[self._architecture] == 0:
+                    self.detector = YoloxDetectionTFLITE()
+                elif self._cheatsheet[self._architecture] == 1:
+                    self.detector = YoloxDetectionPytorch()
+                elif self._cheatsheet[self._architecture] == 2:
+                    self.detector = YoloxDetectionONNX()
+                else:
+                    raise TypeError('not yet')
         else:
             raise TypeError('method or architecture not valid')
 
     def detect(self, in_img):
-        return self.detector.detect(in_img)
+        img_in_size = in_img.shape
+        l_bb = self.detector.detect(in_img)
+        out_det = np.array([l_bb[0, 0]/hardcodedsize[0]*(img_in_size[1]-1),
+                            l_bb[0, 1]/hardcodedsize[1]*(img_in_size[0]-1),
+                            l_bb[0, 2]/hardcodedsize[0]*(img_in_size[1]-1),
+                            l_bb[0, 3]/hardcodedsize[1]*(img_in_size[0]-1),
+                            l_bb[0, 4]])
+        return out_det
 
 
 # ----------------------------------------------------------------------------------------------
 # //////////////////////////////////////////////////////////////////////////////////////////////
+
+
+class DummyDetector:
+    def detect(self, in_img):
+        return np.array([[0.0, 0.0, hardcodedsize[0], hardcodedsize[1], 1.0]])
 
 
 # ----------------------------------------------------------------------------------------------
@@ -66,14 +83,14 @@ class YoloxDetectionPytorch:
         _paths = methodspaths.methodsDict['yolox_Paths']
         self.config = _paths.cfg
         self.checkpoint = _paths.pth
-        self.decodeBB = customsnippets.GetPoseDetectionBBNN()
+        #self.decodeBB = customsnippets.GetPoseDetectionBBNN()
         self._setup()
 
     def _setup(self):
         from mmdet.apis import init_detector
         self.model = customsnippets.build_custom_yolox_from_model(
             init_detector(self.config, self.checkpoint, device='cpu'))
-        self.decodeBB.eval()
+        #self.decodeBB.eval()
 
     def detect(self, in_img):
         probe_img = preprocess_img(in_img)

@@ -234,7 +234,7 @@ def get_poseaug_from_authorsgit():
 
 
 def get_blazepose_from_mediapipe():
-    vvv = '4'
+    vvv = '9'
     url_full = 'https://github.com/google/mediapipe/raw/v0.8.' + vvv + '/mediapipe/modules/pose_landmark/pose_landmark_full.tflite'
     url_heavy = 'https://github.com/google/mediapipe/raw/v0.8.' + vvv + '/mediapipe/modules/pose_landmark/pose_landmark_heavy.tflite'
     url_lite = 'https://github.com/google/mediapipe/raw/v0.8.' + vvv + '/mediapipe/modules/pose_landmark/pose_landmark_lite.tflite'

@@ -4,44 +4,38 @@ class MethodsPaths:
                  path_to_cfg='',
                  path_to_onnx='',
                  path_to_blob='',
-                 path_to_tflite='',
-                 path_to_decodeBB_tflite='',
-                 path_to_decodeBB_onnx=''
+                 path_to_tflite=''
                  ):
         self.pth = path_to_pth
         self.cfg = path_to_cfg
         self.onnx = path_to_onnx
-        self.onnx_decodeBB = path_to_decodeBB_onnx
         self.blob = path_to_blob
         self.tflite = path_to_tflite
-        self.tflite_decodeBB = path_to_decodeBB_tflite
 
 methodsDict = {
     # blazepose -----------------------------------------------------------------------------------------------------------
     # lite ----------------------
-    'blazepose_lite_Paths': MethodsPaths(path_to_tflite='methods/BLAZEPOSE/tflite_files/pose_landmark_lite_v084.tflite',
-                                         path_to_blob='methods/BLAZEPOSE/blob_files/pose_landmark_lite_v084_openvino_2021.4_4shave.blob',
-                                         path_to_onnx='methods/BLAZEPOSE/onnx_files/pose_landmark_lite_v084.onnx'),
+    'blazepose_lite_Paths': MethodsPaths(path_to_tflite='methods/BLAZEPOSE/tflite_files/pose_landmark_lite_v089.tflite',
+                                         path_to_blob='methods/BLAZEPOSE/blob_files/pose_landmark_lite_v089_openvino_2021.4_4shave.blob',
+                                         path_to_onnx='methods/BLAZEPOSE/onnx_files/pose_landmark_lite_v089.onnx'),
 
     # heavy ---------------------
     'blazepose_heavy_Paths': MethodsPaths(
-        path_to_tflite='methods/BLAZEPOSE/tflite_files/pose_landmark_heavy_v084.tflite',
-        path_to_blob='methods/BLAZEPOSE/blob_files/pose_landmark_heavy_v084_openvino_2021.4_4shave.blob',
-        path_to_onnx='methods/BLAZEPOSE/onnx_files/pose_landmark_heavy_v084.onnx'),
+        path_to_tflite='methods/BLAZEPOSE/tflite_files/pose_landmark_heavy_v089.tflite',
+        path_to_blob='methods/BLAZEPOSE/blob_files/pose_landmark_heavy_v089_openvino_2021.4_4shave.blob',
+        path_to_onnx='methods/BLAZEPOSE/onnx_files/pose_landmark_heavy_v089.onnx'),
 
     # full ----------------------
-    'blazepose_full_Paths': MethodsPaths(path_to_tflite='methods/BLAZEPOSE/tflite_files/pose_landmark_full_v084.tflite',
-                                         path_to_blob='methods/BLAZEPOSE/blob_files/pose_landmark_full_v084_openvino_2021.4_4shave.blob',
-                                         path_to_onnx='methods/BLAZEPOSE/onnx_files/pose_landmark_full_v084.onnx'),
+    'blazepose_full_Paths': MethodsPaths(path_to_tflite='methods/BLAZEPOSE/tflite_files/pose_landmark_full_v089.tflite',
+                                         path_to_blob='methods/BLAZEPOSE/blob_files/pose_landmark_full_v089_openvino_2021.4_4shave.blob',
+                                         path_to_onnx='methods/BLAZEPOSE/onnx_files/pose_landmark_full_v089.onnx'),
 
     # yolox ---------------------------------------------------------------------------------------------------------------
     'yolox_Paths': MethodsPaths(path_to_pth='methods/YOLOX/pth_files/yolox_s_8x8_300e_coco.pth',
                                 path_to_cfg='methods/YOLOX/config_files/yolox_s_8x8_300e_coco.py',
                                 path_to_blob='methods/YOLOX/blob_files/yolox_s_8x8_300e_coco_openvino_2021.4_4shave.blob',
                                 path_to_onnx='methods/YOLOX/onnx_files/yolox_s_8x8_300e_coco.onnx',
-                                path_to_tflite='methods/YOLOX/tflite_files/yolox_s_8x8_300e_coco.tflite',
-                                path_to_decodeBB_tflite='methods/YOLOX/tflite_files/decodeBB.tflite',
-                                path_to_decodeBB_onnx='methods/YOLOX/onnx_files/decodeBB.onnx'),
+                                path_to_tflite='methods/YOLOX/tflite_files/yolox_s_8x8_300e_coco.tflite'),
 
     # hrnet ---------------------------------------------------------------------------------------------------------------
     'hrnet_Paths': MethodsPaths(path_to_pth='methods/HRNET/pth_files/hrnet_w32_mpii_256x256.pth',

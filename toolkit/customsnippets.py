@@ -1,6 +1,17 @@
 # ----------------------------------------------------------------------------------------------------------------
 from mmdet.models.detectors.yolox import YOLOX
+from mmpose.models.detectors.top_down import TopDown
+from mmpose.apis import init_pose_model
 import torch
+try:
+    import toolkit.methodspaths as methodspaths
+except:
+    import methodspaths
+
+import sys
+import torch.nn.functional as F
+import torch.nn as nn
+from functools import reduce
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -50,15 +61,329 @@ class CustomYOLOX(YOLOX):
 
 # ----------------------------------------------------------------------------------------------------------------
 
-try:
-    import toolkit.methodspaths as methodspaths
-except:
-    import methodspaths
 
-import sys
-import torch.nn.functional as F
-import torch.nn as nn
-from functools import reduce
+# ----------------------------------------------------------------------------------------------------------------
+class GetLandMarksNet(nn.Module):
+    def __init__(self):
+        super(GetLandMarksNet, self).__init__()
+
+    def _transform_preds(self, coords, center, scale, output_size):
+        """Get final keypoint predictions from heatmaps and apply scaling and
+        translation to map them back to the image.
+
+        Note:
+            num_keypoints: K
+
+        Args:
+            coords (np.ndarray[K, ndims]):
+
+                * If ndims=2, corrds are predicted keypoint location.
+                * If ndims=4, corrds are composed of (x, y, scores, tags)
+                * If ndims=5, corrds are composed of (x, y, scores, tags,
+                  flipped_tags)
+
+            center (np.ndarray[2, ]): Center of the bounding box (x, y).
+            scale (np.ndarray[2, ]): Scale of the bounding box
+                wrt [width, height].
+            output_size (np.ndarray[2, ] | list(2,)): Size of the
+                destination heatmaps.
+            use_udp (bool): Use unbiased data processing
+
+        Returns:
+            np.ndarray: Predicted coordinates in the images.
+
+        """
+        use_udp = False
+
+        # Recover the scale which is normalized by a factor of 200.
+        scale = scale * 200.0
+
+        if use_udp:
+            scale_x = scale[0] / (output_size[0] - 1.0)
+            scale_y = scale[1] / (output_size[1] - 1.0)
+        else:
+            scale_x = scale[0] / output_size[0]
+            scale_y = scale[1] / output_size[1]
+
+        target_coords_a = torch.ones(coords.shape[0], 1)
+        target_coords_b = torch.ones(coords.shape[0], 1)
+        target_coords_c = torch.ones(coords.shape[0], 2)
+
+        target_coords_a = coords[:, 0] * scale_x + center[0] - scale[0] * 0.5
+        target_coords_b = coords[:, 1] * scale_y + center[1] - scale[1] * 0.5
+        target_coords_a = target_coords_a.reshape(coords.shape[0], 1)
+        target_coords_b = target_coords_b.reshape(coords.shape[0], 1)
+        target_coords_c = torch.cat((target_coords_a, target_coords_b),1)
+
+        return target_coords_c
+
+    def _get_max_preds(self, heatmaps):
+        """Get keypoint predictions from score maps.
+
+        Note:
+            batch_size: N
+            num_keypoints: K
+            heatmap height: H
+            heatmap width: W
+
+        Args:
+            heatmaps (np.ndarray[N, K, H, W]): model predicted heatmaps.
+
+        Returns:
+            tuple: A tuple containing aggregated results.
+
+            - preds (np.ndarray[N, K, 2]): Predicted keypoint location.
+            - maxvals (np.ndarray[N, K, 1]): Scores (confidence) of the keypoints.
+        """
+        assert heatmaps.ndim == 4, 'batch_images should be 4-ndim'
+
+        #N, K, W = 1, 16, 64
+        N = torch.tensor(1)
+        K = torch.tensor(16)
+        W = torch.tensor(64)
+        heatmaps_reshaped = heatmaps.reshape((N, K, -1))
+        idx = torch.argmax(heatmaps_reshaped, 2).reshape((N, K, 1))
+
+        dubois = torch.tensor(0)
+        i = 0
+        #for i, x in enumerate(heatmaps_reshaped[0]):
+        for x in heatmaps_reshaped[0]:
+            bb = torch.max(x)
+            cc = bb.reshape(1,)
+
+            if i == 0:
+                dubois = cc
+            else:
+                dubois = torch.cat((dubois, cc), 0)
+            i += 1
+
+        maxvals = dubois.reshape(1, 16, 1)
+
+        preds = torch.ones(N, K, 1)
+        preds = torch.cat((idx, idx), 2).type(torch.float32)
+
+        pkk = preds[:, :, 0]
+        farc = preds[:, :, 1]
+
+        just = pkk % torch.tensor(64.)
+        just = just.reshape(16, 1)
+
+        #jul = farc // float(W)
+        jul = torch.div(farc, W, rounding_mode='trunc')
+        jul = jul.reshape(16, 1)
+        ine = torch.cat((just, jul), 1)
+        eta = ine.reshape(1, 16, 2)
+
+        midlle = torch.cat((maxvals, maxvals), 2) > torch.tensor(0.0)
+        serag = torch.tensor([-1]).type(torch.float32)
+        preds_o = torch.where(midlle, eta, serag[0])
+        return preds_o, maxvals
+
+    def _keypoints_from_heatmaps(self,
+                                 heatmaps,
+                                 center,
+                                 scale#,
+                                 #post_process='default'
+                                 ):
+        """Get final keypoint predictions from heatmaps and transform them back to
+        the image.
+
+        Note:
+            batch size: N
+            num keypoints: K
+            heatmap height: H
+            heatmap width: W
+
+        Args:
+            heatmaps (np.ndarray[N, K, H, W]): model predicted heatmaps.
+            center (np.ndarray[N, 2]): Center of the bounding box (x, y).
+            scale (np.ndarray[N, 2]): Scale of the bounding box
+                wrt height/width.
+            post_process (str/None): Choice of methods to post-process
+                heatmaps. Currently supported: None, 'default', 'unbiased',
+                'megvii'.
+            unbiased (bool): Option to use unbiased decoding. Mutually
+                exclusive with megvii.
+                Note: this arg is deprecated and unbiased=True can be replaced
+                by post_process='unbiased'
+                Paper ref: Zhang et al. Distribution-Aware Coordinate
+                Representation for Human Pose Estimation (CVPR 2020).
+            kernel (int): Gaussian kernel size (K) for modulation, which should
+                match the heatmap gaussian sigma when training.
+                K=17 for sigma=3 and k=11 for sigma=2.
+            valid_radius_factor (float): The radius factor of the positive area
+                in classification heatmap for UDP.
+            use_udp (bool): Use unbiased data processing.
+            target_type (str): 'GaussianHeatmap' or 'CombinedTarget'.
+                GaussianHeatmap: Classification target with gaussian distribution.
+                CombinedTarget: The combination of classification target
+                (response map) and regression target (offset map).
+                Paper ref: Huang et al. The Devil is in the Details: Delving into
+                Unbiased Data Processing for Human Pose Estimation (CVPR 2020).
+
+        Returns:
+            tuple: A tuple containing keypoint predictions and scores.
+
+            - preds (np.ndarray[N, K, 2]): Predicted keypoint location in images.
+            - maxvals (np.ndarray[N, K, 1]): Scores (confidence) of the keypoints.
+        """
+        # N, K, H, W = 1, 16, 64, 64
+        N = torch.tensor(1)
+        K = torch.tensor(16)
+        H = torch.tensor(64)
+        W = torch.tensor(64)
+
+        preds, maxvals = self._get_max_preds(heatmaps)
+
+        n = N-torch.tensor(1)
+        wally = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+
+        poljot = torch.tensor([-1, -1]).reshape(1, 2)
+
+        for k, kk in enumerate(wally):
+            heatmap = heatmaps[n][k]
+            px = preds[n][k][0].int()
+            py = preds[n][k][1].int()
+
+            if 1 < px < W - torch.tensor(1.) and 1 < py < H - torch.tensor(1.):
+                #aa = px + torch.tensor(1)
+                aa = torch.add(px, torch.tensor(1))
+                #bb = px - torch.tensor(1)
+                bb = torch.sub(px, torch.tensor(1))
+                #cc = py + torch.tensor(1)
+                cc = torch.add(py, torch.tensor(1))
+                #dd = py - torch.tensor(1)
+                dd = torch.sub(py, torch.tensor(1))
+                #diff = torch.tensor([
+                #    heatmap[py][aa] - heatmap[py][bb],
+                #    heatmap[cc][px] - heatmap[dd][px]
+                #])
+                dif_part1 = torch.sub(heatmap[py][aa], heatmap[py][bb]).view(1, 1)
+                dif_part2 = torch.sub(heatmap[cc][px], heatmap[dd][px]).view(1, 1)
+                diff = torch.cat((
+                    dif_part1,
+                    dif_part2
+                ), 1)
+                alpha = torch.sign(diff) * torch.tensor(.25)
+                beta = preds[n][k]
+                gamma = beta + alpha
+                if k == 0:
+                    poljot = gamma.reshape(1, 2)
+                else:
+                    poljot = torch.cat((poljot, gamma.reshape(1, 2)), torch.tensor(0))
+
+            else:
+                if k == 0:
+                    omega = preds[n][k]
+                    poljot = omega.reshape(1, 2)
+                else:
+                    omega = preds[n][k]
+                    poljot = torch.cat((poljot, omega.reshape(1, 2)), torch.tensor(0))
+
+        poljot = poljot.reshape(1, 16, 2)
+
+        # Transform back to the image
+        ind_i = N-1
+        outsize_t = torch.tensor([W, H])
+
+        raketa = self._transform_preds(
+            poljot[ind_i], center[ind_i], scale[ind_i], outsize_t)
+        raketa = raketa.reshape(1, 16, 2)
+
+        return raketa, maxvals
+
+    def _get_new_seven_alt(self, point_a_t, point_b_t):
+        # https://stackoverflow.com/questions/21565994/method-to-return-the-equation-of-a-straight-line-given-two-points
+        point_a_t = point_a_t.reshape(1, 2)
+        point_b_t = point_b_t.reshape(1, 2)
+        point_t = torch.cat((point_a_t, point_b_t), 0)
+        out = torch.mean(point_t, 0)
+        return torch.round(out)
+
+    def _reorder_landmarks(self, input_landmarks):
+        cheat_list = [6, 3, 4, 5, 2, 1, 0, 7, 8, 9, 12, 11, 10, 13, 14, 15]
+
+        out_land_alt = input_landmarks[0][cheat_list]
+
+        out_land = torch.ones(1, 2)
+        for ii, jj in enumerate(cheat_list):
+            if ii == 0:
+                out_land = input_landmarks[0][jj, :].reshape(1, 2)
+            elif ii == 7:
+                n7 = self._get_new_seven_alt(out_land_alt[0, :].reshape(1, 2), out_land_alt[8, :].reshape(1, 2))
+                out_land = torch.cat((out_land, n7.reshape(1, 2)), 0)
+            else:
+               out_land = torch.cat((out_land, input_landmarks[0][jj, :].reshape(1, 2)), 0)
+
+        '''
+        out_land_alt[7] = self._get_new_seven_alt(out_land_alt[0, :].reshape(1, 2), out_land_alt[8, :].reshape(1, 2))
+        '''
+
+        flip_h = [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 13, 14, 15, 10, 11, 12]
+
+        out_land = out_land[flip_h]
+        return out_land.reshape(1, 16, 2)
+        '''
+        out_land = out_land_alt[flip_h]
+        return out_land.reshape(1, 16, 2)
+        '''
+
+    def forward(self, heatmaps):
+        c = torch.zeros(1, 2, dtype=torch.float32)
+        center = torch.tensor([[128., 128.]]).type(torch.float32)
+        c[0] = center[0]
+        s = torch.tensor([[256.0 / 200, 256.0 / 200]], dtype=torch.float32)
+        preds, maxvals = self._keypoints_from_heatmaps(heatmaps, c, s)
+        predsh36m = self._reorder_landmarks(preds)
+
+        return predsh36m
+
+def build_custom_hrnet():
+
+    in_cnfg = methodspaths.methodsDict['hrnet_Paths'].cfg
+    in_chckpnt = methodspaths.methodsDict['hrnet_Paths'].pth
+    model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
+    _config = model.cfg._cfg_dict['model']
+    custom_hrnet = CustomHRNET(_config['backbone'],
+                               None,
+                               _config['keypoint_head'],
+                               _config['train_cfg'],
+                               _config['test_cfg'],
+                               _config['pretrained'],
+                               None)
+    custom_hrnet.forward = custom_hrnet.customforward
+    ckpt = torch.load(in_chckpnt)
+    custom_hrnet.load_state_dict(ckpt['state_dict'])
+
+    return custom_hrnet
+
+
+class CustomHRNET(TopDown):
+    """
+       this code is modified base on MMPOSE TOPDOWN HRNET code,
+       https://github.com/open-mmlab/mmpose/blob/master/mmpose/models/detectors/top_down.py
+    """
+
+    @torch.no_grad()
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.decodeHM = GetLandMarksNet()
+
+    @torch.no_grad()
+    def customforward(self, img):
+        output = self.backbone(img)
+        if self.with_neck:
+            output = self.neck(output)
+        if self.with_keypoint:
+            output = self.keypoint_head(output)
+        pose = self.decodeHM(output)
+        return pose
+
+
+
+# ----------------------------------------------------------------------------------------------------------------
+
+
 
 x2 = methodspaths.methodsDict['gcn_Paths'].cfg
 addit_path = "/".join(x2.split("/")[:-1])
@@ -532,8 +857,11 @@ class GetPoseDetectionBBNN(nn.Module):
 
         img_size = torch.tensor([640, 640])
 
-        hsizes = [img_size[0] // stride for stride in strides]
-        wsizes = [img_size[1] // stride for stride in strides]
+        #hsizes = [img_size[0] // stride for stride in strides]
+        #wsizes = [img_size[1] // stride for stride in strides]
+        hsizes = [torch.div(img_size[0], stride, rounding_mode='trunc') for stride in strides]
+        wsizes = [torch.div(img_size[1], stride, rounding_mode='trunc') for stride in strides]
+
         shapes_hard = [torch.ones(1, 6400), torch.ones(1, 1600), torch.ones(1, 400)]
 
         # iter zero

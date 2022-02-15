@@ -6,6 +6,7 @@ from tqdm import tqdm
 import h5py
 from os import path
 import numpy as np
+import configparser
 
 
 def _progress(iterator, name):
@@ -126,6 +127,50 @@ def explore_test_data(src_dir):
             wally = 'here'
 
 # ----------------------------------------------------------------------------------------------
+
+
+class TDHP_walker:
+    def __init__(self):
+        self._setup()
+
+    def _setup(self):
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+        self.src_dir = path_to_3dhp_folder = config['General']['PATHTO3DHPFOLDER']
+
+        self.outer_iter = RawMpiTestDataset.SEQ_IDS
+        self.outer_pos = 0
+        self.outer_last = len(self.outer_iter)
+        self._prepare_inner_iter_from_pos(self.outer_pos)
+        wally = 'here'
+
+    def _prepare_inner_iter_from_pos(self, probe_index):
+        dataset = RawMpiTestSeqDataset(self.src_dir, self.outer_iter[probe_index], valid_only=True)
+        self.inner_iter = dataset
+        self.inner_pos = 0
+        self.inner_last = len(self.inner_iter)
+        wally = 'here'
+
+    def get_next(self):
+        example = self.inner_iter[self.inner_pos]
+        image = cv2.imread(example['image_file'])
+        annot2 = example['annot2']
+        annot3 = example['annot3']
+        p_annot2 = preprocess2d_3dhp(annot2)
+        p_annot3 = preprocess3d_3dhp(annot3)
+
+        self.inner_pos += 1
+
+        if self.inner_pos == self.inner_last:
+            self.outer_pos += 1
+            if self.outer_pos == self.outer_last:
+                return -1, -1, -1
+            else:
+                self._prepare_inner_iter_from_pos(self.outer_pos)
+
+        return image, p_annot2, p_annot3
+
+
 def test():
     import configparser
 
