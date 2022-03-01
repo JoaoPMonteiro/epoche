@@ -16,7 +16,6 @@ try:
 except:
     import customsnippets
 
-
 number_shaves = 4
 opset_version = 11
 
@@ -95,6 +94,7 @@ def process_blazepose():
     export_onnx_blob(landmark_onnx_heavy, path_blob)
     export_onnx_blob(landmark_onnx_lite, path_blob)
 
+
 '''
 def process_yolox_decode():
     try:
@@ -165,7 +165,6 @@ def process_yolox_decode():
 def process_yolox():
     from mmdet.apis import init_detector
 
-
     # ------------------------------------------------------------------------------------------------------
     # pytorch to onnx
 
@@ -220,7 +219,7 @@ def process_yolox():
     )
 
     # --------------------------------------------------------------------------------------------------------
-    #https://github.com/sithu31296/PyTorch-ONNX-TFLite
+    # https://github.com/sithu31296/PyTorch-ONNX-TFLite
     path_tflite = 'methods/YOLOX/tflite_files'
 
     if not os.path.isdir(path_tflite):
@@ -249,11 +248,11 @@ def process_yolox():
         f.write(tflite_model)
 
     # --------------------------------------------------------------------------------------------------------
-    #process_yolox_decode()
+    # process_yolox_decode()
 
 
 def process_hrnet():
-    from mmpose.apis import init_pose_model
+    # from mmpose.apis import init_pose_model
 
     # ------------------------------------------------------------------------------------------------------
     # pytorch to onnx
@@ -268,12 +267,12 @@ def process_hrnet():
     if not os.path.isdir(path_blob):
         os.makedirs(path_blob)
 
-    in_chckpnt = 'methods/HRNET/pth_files/hrnet_w32_mpii_256x256.pth'
-    in_cnfg = 'methods/HRNET/config_files/hrnet_w32_mpii_256x256.py'
+    # in_chckpnt = 'methods/HRNET/pth_files/hrnet_w32_mpii_256x256.pth'
+    # in_cnfg = 'methods/HRNET/config_files/hrnet_w32_mpii_256x256.py'
     output_file = 'methods/HRNET/onnx_files/hrnet_w32_mpii_256x256.onnx'
 
-    #model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
-    #model.forward = model.forward_dummy
+    # model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
+    # model.forward = model.forward_dummy
     model = customsnippets.build_custom_hrnet()
 
     model.cpu().eval()
@@ -281,16 +280,30 @@ def process_hrnet():
     one_img = torch.randn([1, 3, 256, 256], requires_grad=False)
     pytorch_results = model(one_img)
 
+    #scripted_module = torch.jit.script(customsnippets.build_custom_hrnet())
+
     torch.onnx.export(
         model,
         one_img,
         output_file,
         export_params=True,
         keep_initializers_as_inputs=False,
-        verbose=True,
-        opset_version=opset_version)
+        verbose=False,
+        opset_version=12)
 
-    check_onnx_(pytorch_results.detach().cpu(), output_file, one_img.detach().cpu().numpy())
+    check_onnx_(pytorch_results.detach().cpu().numpy(), output_file, one_img.detach().cpu().numpy())
+
+    if True:
+
+        another_img = torch.zeros([1, 3, 256, 256], requires_grad=False)
+        another_results = model(another_img)
+
+        check_onnx_(another_results.detach().cpu().numpy(), output_file, another_img.detach().cpu().numpy())
+
+        yetanother_img = torch.ones([1, 3, 256, 256], requires_grad=False)
+        yetanother_results = model(yetanother_img)
+
+        check_onnx_(yetanother_results.detach().cpu().numpy(), output_file, yetanother_img.detach().cpu().numpy())
 
     # ------------------------------------------------------------------------------------------------------
     # onnx to myriadX blob
@@ -341,7 +354,7 @@ def process_method(in_method, optional=None):
         one_img = torch.randn([1, 16, 2], requires_grad=False)
         pytorch_results = model_pos(one_img)
 
-        output_file = methodspaths.methodsDict[in_method+'_Paths'].onnx
+        output_file = methodspaths.methodsDict[in_method + '_Paths'].onnx
 
         torch.onnx.export(model_pos,
                           one_img,

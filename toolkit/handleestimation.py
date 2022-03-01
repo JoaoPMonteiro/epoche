@@ -22,10 +22,14 @@ try:
     import toolkit.handledetection as handledetection
 except:
     import handledetection
+try:
+    import toolkit.handledepthai as handledepthai
+except:
+    import handledepthai
 
 
 class PosePipeline:
-    def __init__(self, method='blazepose_lite', architecture='tflite', detector='none'):
+    def __init__(self, method, architecture, detector):
         self._methods_pool = ['blazepose_lite',
                               'blazepose_full',
                               'blazepose_heavy',
@@ -37,7 +41,7 @@ class PosePipeline:
                               'hrnet_poseaugsbl',
                               'hrnet_poseauggcn',
                               'hrnet_poseaugstgcn']
-        self._architecture_pool = ['tflite', 'pytorch', 'onnx']
+        self._architecture_pool = ['tflite', 'pytorch', 'onnx', 'vpu']
         self._det_pool = ['none', 'yolox']
         self._method = method
         self._architecture = architecture
@@ -50,23 +54,29 @@ class PosePipeline:
         dt_ok = any(self._detector == word for word in self._det_pool)
 
         if mthd_ok and rchtctr_ok and dt_ok:
-            self.detectorInst = handledetection.PoseDetection(method=self._detector,
-                                                              architecture=self._architecture)
-            self.estimatorInst = PoseEstimation(method=self._method,
-                                                architecture=self._architecture)
+            if self._architecture == 'vpu':
+                self.pipe_vpu = handledepthai.PoseEdgeWorker(method=self._method, detector=self._detector)
+            else:
+                self.detectorInst = handledetection.PoseDetection(method=self._detector,
+                                                                  architecture=self._architecture)
+                self.estimatorInst = PoseEstimation(method=self._method,
+                                                    architecture=self._architecture)
         else:
             raise TypeError('method or architecture not valid')
 
     def estimate(self, in_img):
-        outbb = self.detectorInst.detect(in_img)
-        outd_pose = self.estimatorInst.estimate(in_img, outbb)
-        outd_pose = outd_pose - outd_pose[0, :]
+        if self._architecture == 'vpu':
+            outd_pose = self.pipe_vpu.estimate(in_img)
+        else:
+            outbb = self.detectorInst.detect(in_img)
+            outd_pose = self.estimatorInst.estimate(in_img, outbb)
+            outd_pose = outd_pose - outd_pose[0, :]
 
         return outd_pose
 
 
 class PoseEstimation:
-    def __init__(self, method='blazepose_lite', architecture='tflite'):
+    def __init__(self, method, architecture):
         self._methods_pool = ['blazepose_lite',
                               'blazepose_full',
                               'blazepose_heavy',
@@ -144,7 +154,7 @@ class OnnxWorker:
 
 
 class PoseEstimation2D:
-    def __init__(self, method='hrnet', architecture='pytorch'):
+    def __init__(self, method, architecture):
         self._methods_pool = ['hrnet']
         self._architecture_pool = ['pytorch', 'onnx']
         self._method = method
@@ -169,7 +179,25 @@ class PoseEstimation2D:
             raise TypeError('method or architecture not valid')
 
     def estimate(self, in_img):
-        return self._model.estimate(in_img)
+        out_landmarks = self._model.estimate(in_img)
+        # def drawPreds(image_in, preds_in):
+        #    image_out = image_in.copy()
+        #    image_out = np.moveaxis(image_out, [0, 1, 2, 3], [0, 3, 2, 1])
+        #    image_out = np.moveaxis(image_out, [0, 1, 2, 3], [0, 2, 1, 3])
+        #    image_out2 = image_out[0].astype(np.uint8).copy()
+        #    probe_test = np.zeros((640, 640, 3), np.uint8)
+        #    for set in preds_in:
+        #        for point in set:
+        #            x = int(point[0])
+        #            y = int(point[1])
+        #            image_out = cv2.circle(image_out2, (x, y), 3, (255, 0, 0), thickness=-1)
+        #            #(img, center, radius, color, thickness=None, lineType=None, shift=None):
+        #    # cv2.imwrite('onetime.png', image_out)
+
+        #    return image_out
+
+        # asd = drawPreds(in_img, out_landmarks)
+        return out_landmarks
 
 
 # ----------------------------------------------------------------------------------------------
@@ -179,7 +207,7 @@ class PoseEstimation2D:
 # ----------------------------------------------------------------------------------------------
 # //////////////////////////////////////////////////////////////////////////////////////////////
 class PoseLifting:
-    def __init__(self, method='vpose', architecture='pytorch'):
+    def __init__(self, method, architecture):
         self._methods_pool = ['vpose',
                               'sbl',
                               'gcn',
@@ -216,6 +244,7 @@ class PoseLifting:
                 id_method = self._method
             self._paths = methodspaths.methodsDict[_id_paths]
             id_arch = [jj for jj, ii in enumerate(self._architecture_pool) if ii == self._architecture]
+            self._id_method = id_method
             if id_arch[0] == 0:
                 self._init_pytorch(id_method)
             elif id_arch[0] == 1:
@@ -387,21 +416,36 @@ class PoseLifting:
         l_paths = self._paths
         pfof = l_paths.onnx
         self._model = OnnxWorker(pfof)
-        wally = 'here'
+        #wally = 'here'
 
     def estimate(self, in_img):
+        #if self._id_method == 'gcn':
+        #    asdasdasd = [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 13, 14, 15, 10, 11, 12]
+        #    #asdasdasd = [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        #    in_img = in_img[asdasdasd]  # wally
+        #import toolkit.assortedroutines
+        #toolkit.assortedroutines.another_2d_plot2(in_img)
+        #wally = 'here'
+
         if self._architecture == 'pytorch':
             l_in_1 = torch.from_numpy(in_img)  # temp
             l_in_2 = l_in_1.view(1, -1).float()
             with torch.no_grad():
                 oustp = self._model(l_in_2)
-            return oustp.detach().numpy()
+            outpn = oustp.detach().numpy()
         elif self._architecture == 'onnx':
             p_img = np.array([in_img, ], dtype=np.float32)
             out_0 = self._model.estimate(p_img)
-            return out_0
+            outpn = out_0
         else:
             raise TypeError('selection not valid')
+
+        #if self._id_method == 'gcn':
+        #    asdasdasd = [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 13, 14, 15, 10, 11, 12]
+        #    #asdasdasd = [0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        #    outpn[0] = outpn[0][asdasdasd]  # wally
+
+        return outpn
 
     def get_model(self):
         return self._model
@@ -445,7 +489,7 @@ def from_blazepose_to_16(in_body):
     # remove nose
     rem_nose = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16]
     no_nose = arr[rem_nose]
-    #outout = no_nose - no_nose[0, :]
+    # outout = no_nose - no_nose[0, :]
 
     return no_nose
 
@@ -456,6 +500,7 @@ class SStfl:
     '''
     single stage tensor flow lite estimator
     '''
+
     def __init__(self, in_method):
         self._paths = methodspaths.methodsDict
         self._method = in_method
@@ -474,13 +519,13 @@ class SStfl:
     def estimate(self, in_img):
         self.interpreter.set_tensor(self._input_details[0]['index'], in_img)
         self.interpreter.invoke()
-        #outputid = self.interpreter.get_tensor(self._output_details[0]['index'])
+        # outputid = self.interpreter.get_tensor(self._output_details[0]['index'])
         output3d = self.interpreter.get_tensor(self._output_details[4]['index'])
         output3d_out = output3d.reshape(39, 3)
         post_3d = from_blazepose_to_16(output3d_out)
-        #import toolkit.assortedroutines
-        #toolkit.assortedroutines.another_3d_plot(post_3d)
-        #toolkit.assortedroutines.another_3d_plot(output3d_out)
+        # import toolkit.assortedroutines
+        # toolkit.assortedroutines.another_3d_plot(post_3d)
+        # toolkit.assortedroutines.another_3d_plot(output3d_out)
         post_3d = post_3d - post_3d[0, :]
         return post_3d
 
@@ -511,7 +556,7 @@ class SSo:
 
 
 class SingleStage3D:
-    def __init__(self, method='blazepose_lite', architecture='tflite'):
+    def __init__(self, method, architecture):
         self._methods_pool = ['blazepose_lite',
                               'blazepose_full',
                               'blazepose_heavy']
@@ -544,8 +589,8 @@ class SingleStage3D:
         imginfo = in_img.shape
         iw = imginfo[0]
         ih = imginfo[1]
-        #ms_bbox_result = in_bb
-        #persons = ms_bbox_result[0]
+        # ms_bbox_result = in_bb
+        # persons = ms_bbox_result[0]
         person_bb = in_bb[:4]
         person_bb = person_bb.astype(int)
         xis_factor_x = 0.05
@@ -599,12 +644,12 @@ class SingleStage3D:
         det_roi, roi_bb = self.handleroi(in_img, in_bb)
         # resize
         probe_img_0 = cv2.resize(det_roi, (self.input_size[1], self.input_size[2]),
-                               interpolation=cv2.INTER_AREA)
+                                 interpolation=cv2.INTER_AREA)
         probe_img_0 = cv2.cvtColor(probe_img_0, cv2.COLOR_BGR2RGB)
         probe_img_0 = np.array([probe_img_0]).astype(np.float32)
         # normalize
-        #probe_img_0 -= 127.5
-        #probe_img_0 /= 127.5
+        # probe_img_0 -= 127.5
+        # probe_img_0 /= 127.5
         probe_img_0 /= 255.
         # The original landmark model is expecting RGB [0, 1] frames.
         # https://github.com/geaxgx/depthai_blazepose/blob/c72a4a9652223a53cb63ea893810126ed3d63d12/README.md
@@ -615,7 +660,6 @@ class SingleStage3D:
         return self.worker.estimate(probe_img)
 
 
-
 # ----------------------------------------------------------------------------------------------
 # //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -623,7 +667,7 @@ class SingleStage3D:
 # //////////////////////////////////////////////////////////////////////////////////////////////
 # ----------------------------------------------------------------------------------------------
 class TwoStage3D:
-    def __init__(self, first_stage='hrnet', second_stage='vpose', architecture='pytorch'):
+    def __init__(self, first_stage, second_stage, architecture):
         self._first_stage = first_stage
         self._second_stage = second_stage
         self._architecture = architecture
@@ -637,8 +681,8 @@ class TwoStage3D:
         imginfo = in_img.shape
         iw = imginfo[0]
         ih = imginfo[1]
-        #ms_bbox_result = in_bb
-        #persons = ms_bbox_result[0]
+        # ms_bbox_result = in_bb
+        # persons = ms_bbox_result[0]
         person_bb = in_bb[:4]
         person_bb = person_bb.astype(int)
         xis_factor_x = 0.05
@@ -691,32 +735,68 @@ class TwoStage3D:
         # apply ROI
         det_roi, roi_bb = self.handleroi(in_img, in_bb)
         # resize
-        probe_img_0 = cv2.resize(det_roi, (256, 256),  # hardcoded for hrnet
-                               interpolation=cv2.INTER_AREA)
+        probe_img_0 = cv2.resize(det_roi, (256, 256),  # hardcoded for hrnet todo: move all constants to somewhere else
+                                 interpolation=cv2.INTER_AREA)
         probe_img_0 = cv2.cvtColor(probe_img_0, cv2.COLOR_BGR2RGB)
         probe_img_0 = np.array([probe_img_0]).astype(np.float32)
         # normalize
-        #probe_img_0 -= 127.5
-        #probe_img_0 /= 127.5
-        probe_img_0 /= 255.
+        # probe_img_0 -= 127.5
+        # probe_img_0 /= 127.5
+        # probe_img_0 /= 255.
 
-        #input_i = np.array([probe_img_0, ], dtype=np.float32)
+        # input_i = np.array([probe_img_0, ], dtype=np.float32)
         input_i = np.moveaxis(probe_img_0, 3, 1)
 
-        return input_i
+        return roi_bb, input_i
 
-    def preprocess_landmarks(self, in_pose):
-        o_pose = in_pose
-        _w = _h = 256  # hardcoded hrnet out
-        o_pose = (o_pose / _w * 2 - [1, _h / _w])
-        return o_pose[0]
+    def preprocess_landmarks(self, in_pose, in_bb):
+        recover_original_img_aspect_ratio = True
+        if recover_original_img_aspect_ratio:
+            bbd_width = in_bb[2] - in_bb[0]
+            bbd_height = in_bb[3] - in_bb[1]
+
+            o_pose = in_pose[0]
+            _w = _h = 256.  # hardcoded hrnet out todo: move all constants to somewhere else
+
+            in_pose_in = o_pose
+            in_pose_in[:, 0] = o_pose[:, 0] / _w * bbd_width
+            in_pose_in[:, 1] = o_pose[:, 1] / _h * bbd_height
+            in_pose_in[:, 0] = in_pose_in[:, 0] + in_bb[0]
+            in_pose_in[:, 1] = in_pose_in[:, 1] + in_bb[1]
+
+            o_pose = (in_pose_in / self._ori_img_shape[0] * 2 - [1, self._ori_img_shape[1] / self._ori_img_shape[0]])
+        else:
+            o_pose = in_pose[0]
+            in_pose_in = in_pose[0]
+            _w = _h = 256.
+            o_pose = (o_pose / _w * 2 - [1, _h / _w])
+
+        return in_pose_in, o_pose
 
     def estimate(self, in_img, in_bb):
-        t_img = self.preprocess_img(in_img, in_bb)
+        self._ori_img_shape = in_img.shape
+        rbb, t_img = self.preprocess_img(in_img, in_bb)
         t_td = self._est.estimate(t_img)
-        t_tdp = self.preprocess_landmarks(t_td)
+        #temptemp, t_tdp = self.preprocess_landmarks(t_td, in_bb) # wally
+        temptemp, t_tdp = self.preprocess_landmarks(t_td, rbb)
+
+        def drawPreds(image_in, preds_in):
+            image_out = image_in.copy()
+
+            for point in preds_in:
+                #for point in set:
+                x = int(point[0])
+                y = int(point[1])
+                image_out = cv2.circle(image_out, (x, y), 3, (255, 0, 0), thickness=-1)
+                #(img, center, radius, color, thickness=None, lineType=None, shift=None):
+            # cv2.imwrite('onetime.png', image_out)
+
+            return image_out
+
+        # asd = drawPreds(in_img, temptemp)
         t_op = self._lif.estimate(t_tdp)
         return t_op[0]
+
 
 # ----------------------------------------------------------------------------------------------
 # //////////////////////////////////////////////////////////////////////////////////////////////
@@ -730,5 +810,5 @@ def test():
 
 # ----------------------------------------------------------------------------------------------
 if __name__ == '__main__':
-    #test()
+    # test()
     wally = 'here'

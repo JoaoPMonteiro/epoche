@@ -3,6 +3,7 @@ from mmdet.models.detectors.yolox import YOLOX
 from mmpose.models.detectors.top_down import TopDown
 from mmpose.apis import init_pose_model
 import torch
+
 try:
     import toolkit.methodspaths as methodspaths
 except:
@@ -48,7 +49,7 @@ class CustomYOLOX(YOLOX):
                  random_size_interval=10,
                  init_cfg=None):
         super().__init__(backbone, neck, bbox_head, train_cfg,
-                                    test_cfg, pretrained, init_cfg)
+                         test_cfg, pretrained, init_cfg)
         self.decodeBB = GetPoseDetectionBBNN()
 
     @torch.no_grad()
@@ -113,7 +114,7 @@ class GetLandMarksNet(nn.Module):
         target_coords_b = coords[:, 1] * scale_y + center[1] - scale[1] * 0.5
         target_coords_a = target_coords_a.reshape(coords.shape[0], 1)
         target_coords_b = target_coords_b.reshape(coords.shape[0], 1)
-        target_coords_c = torch.cat((target_coords_a, target_coords_b),1)
+        target_coords_c = torch.cat((target_coords_a, target_coords_b), 1)
 
         return target_coords_c
 
@@ -137,25 +138,22 @@ class GetLandMarksNet(nn.Module):
         """
         assert heatmaps.ndim == 4, 'batch_images should be 4-ndim'
 
-        #N, K, W = 1, 16, 64
-        N = torch.tensor(1)
-        K = torch.tensor(16)
-        W = torch.tensor(64)
+        N, K, W = 1, 16, 64
         heatmaps_reshaped = heatmaps.reshape((N, K, -1))
         idx = torch.argmax(heatmaps_reshaped, 2).reshape((N, K, 1))
 
         dubois = torch.tensor(0)
-        i = 0
-        #for i, x in enumerate(heatmaps_reshaped[0]):
-        for x in heatmaps_reshaped[0]:
-            bb = torch.max(x)
-            cc = bb.reshape(1,)
+        for i, x in enumerate(heatmaps_reshaped[0]):
+            c_probe = heatmaps_reshaped[0][i]
+            bb = torch.max(c_probe)
+            cc = bb.reshape(1, )
 
             if i == 0:
                 dubois = cc
             else:
                 dubois = torch.cat((dubois, cc), 0)
-            i += 1
+
+        # dubois = torch.max(heatmaps_reshaped, keepdim=False, dim=2).values
 
         maxvals = dubois.reshape(1, 16, 1)
 
@@ -165,16 +163,16 @@ class GetLandMarksNet(nn.Module):
         pkk = preds[:, :, 0]
         farc = preds[:, :, 1]
 
-        just = pkk % torch.tensor(64.)
+        just = pkk % float(W)
         just = just.reshape(16, 1)
 
-        #jul = farc // float(W)
-        jul = torch.div(farc, W, rounding_mode='trunc')
+        # jul = farc // float(W)
+        jul = torch.div(farc, W, rounding_mode='floor')
         jul = jul.reshape(16, 1)
         ine = torch.cat((just, jul), 1)
         eta = ine.reshape(1, 16, 2)
 
-        midlle = torch.cat((maxvals, maxvals), 2) > torch.tensor(0.0)
+        midlle = torch.cat((maxvals, maxvals), 2) > 0.0
         serag = torch.tensor([-1]).type(torch.float32)
         preds_o = torch.where(midlle, eta, serag[0])
         return preds_o, maxvals
@@ -182,8 +180,8 @@ class GetLandMarksNet(nn.Module):
     def _keypoints_from_heatmaps(self,
                                  heatmaps,
                                  center,
-                                 scale#,
-                                 #post_process='default'
+                                 scale  # ,
+                                 # post_process='default'
                                  ):
         """Get final keypoint predictions from heatmaps and transform them back to
         the image.
@@ -235,55 +233,125 @@ class GetLandMarksNet(nn.Module):
 
         preds, maxvals = self._get_max_preds(heatmaps)
 
-        n = N-torch.tensor(1)
+        n = N - 1
         wally = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
 
-        poljot = torch.tensor([-1, -1]).reshape(1, 2)
+        # poljot = torch.tensor([-1,-1]).reshape(1,2)
 
+        def func1(_preds, _n, _heatmap, _px, _py, _k, _poljot):
+            eeeeeeeee = _heatmap.shape
+            aaaaaaaaa = _heatmap[_py, _px + 1]
+            bbbbbbbbb = _heatmap[_py, _px - 1]
+            ccccccccc = _heatmap[_py + 1, _px]
+            ddddddddd = _heatmap[_py - 1, _px]
+            difparta = (aaaaaaaaa - bbbbbbbbb).view(1, )
+            difpartb = (ccccccccc - ddddddddd).view(1, )
+            diff = torch.cat((
+                difparta,
+                difpartb
+            ))
+
+            def sign_alt(in_tensor):
+                sign_0 = torch.gt(in_tensor, 0.).float()
+                sign_1 = torch.where(sign_0 == 0., torch.tensor(-1.), sign_0)
+                sign_2 = torch.eq(in_tensor, 0.)
+                sign_3 = ~sign_2
+                sign_3 = sign_3.float()
+                sign_alt = torch.mul(sign_1, sign_3)
+                sign_alt = torch.where(sign_alt == -0., torch.tensor(0.), sign_alt)
+                return sign_alt
+
+            alpha = sign_alt(diff) * .25
+            # alpha = torch.sign(diff) * .25
+            beta = _preds[_n][_k]
+            gamma = beta + alpha
+            if _k == 0:
+                _poljot = gamma.reshape(1, 2)
+            else:
+                _poljot = torch.cat((_poljot, gamma.reshape(1, 2)), 0)
+
+            return _poljot
+
+        def func2(_preds, _n, _heatmap, _px, _py, _k, _poljot):
+            if _k == 0:
+                omega = _preds[_n][_k]
+                _poljot = omega.reshape(1, 2)
+            else:
+                omega = _preds[_n][_k]
+                _poljot = torch.cat((_poljot, omega.reshape(1, 2)), 0)
+
+            return _poljot
+
+        poljot = torch.zeros(1, 1)
         for k, kk in enumerate(wally):
             heatmap = heatmaps[n][k]
             px = preds[n][k][0].int()
             py = preds[n][k][1].int()
+            #px = torch.tensor(234567890, dtype=torch.int32)
+            #py = torch.tensor(234567890, dtype=torch.int32)
 
-            if 1 < px < W - torch.tensor(1.) and 1 < py < H - torch.tensor(1.):
-                #aa = px + torch.tensor(1)
-                aa = torch.add(px, torch.tensor(1))
-                #bb = px - torch.tensor(1)
-                bb = torch.sub(px, torch.tensor(1))
-                #cc = py + torch.tensor(1)
-                cc = torch.add(py, torch.tensor(1))
-                #dd = py - torch.tensor(1)
-                dd = torch.sub(py, torch.tensor(1))
-                #diff = torch.tensor([
-                #    heatmap[py][aa] - heatmap[py][bb],
-                #    heatmap[cc][px] - heatmap[dd][px]
-                #])
-                dif_part1 = torch.sub(heatmap[py][aa], heatmap[py][bb]).view(1, 1)
-                dif_part2 = torch.sub(heatmap[cc][px], heatmap[dd][px]).view(1, 1)
-                diff = torch.cat((
-                    dif_part1,
-                    dif_part2
-                ), 1)
-                alpha = torch.sign(diff) * torch.tensor(.25)
-                beta = preds[n][k]
-                gamma = beta + alpha
-                if k == 0:
-                    poljot = gamma.reshape(1, 2)
-                else:
-                    poljot = torch.cat((poljot, gamma.reshape(1, 2)), torch.tensor(0))
+            # _option0 = torch.zeros(1, dtype=torch.bool) # torch.where(px > torch.tensor(1.), True, False)
+            # _option1 = torch.zeros(1, dtype=torch.bool) #torch.where(py > torch.tensor(1.), True, False)
+            # _option2 = torch.zeros(1, dtype=torch.bool) #torch.where(torch.gt(torch.sub(W, 1.), px), True, False)
+            # _option3 = torch.zeros(1, dtype=torch.bool) #torch.where(torch.gt(torch.sub(H, 1.), py), True, False)
+            #_option0 = torch.where(px > 1.,
+            #                       torch.ones(1, dtype=torch.bool), torch.zeros(1, dtype=torch.bool))
+            #_option1 = torch.where(py > 1.,
+            #                       torch.ones(1, dtype=torch.bool), torch.zeros(1, dtype=torch.bool))
+            #_option2 = torch.where(torch.gt(W - 1, px),
+            #                       torch.ones(1, dtype=torch.bool), torch.zeros(1, dtype=torch.bool))
+            #_option3 = torch.where(torch.gt(H - 1, py),
+            #                       torch.ones(1, dtype=torch.bool), torch.zeros(1, dtype=torch.bool))
 
-            else:
-                if k == 0:
-                    omega = preds[n][k]
-                    poljot = omega.reshape(1, 2)
-                else:
-                    omega = preds[n][k]
-                    poljot = torch.cat((poljot, omega.reshape(1, 2)), torch.tensor(0))
+            #opone = torch.cat((_option0.view(1, ), _option1.view(1, )))
+            #optwo = torch.cat((_option2.view(1, ), _option3.view(1, )))
+            #op3 = torch.cat((opone, optwo))
+            #op4 = torch.all(op3, 0, keepdim=False)
+
+            backuptensor = torch.tensor(1, dtype=torch.int32)
+
+            px_dummy = torch.where(px > 1.,
+                                   px, backuptensor) #, dtype=torch.int32
+            px_dummy = torch.where(torch.gt(W - 1, px_dummy),
+                                   px_dummy, backuptensor)
+
+            py_dummy = torch.where(py > 1.,
+                                   py, backuptensor)
+            py_dummy = torch.where(torch.gt(H - 1, py_dummy),
+                                   py_dummy, backuptensor)
+
+            #py_dummy = torch.where(op4 == torch.ones(1, dtype=torch.bool),
+            #                       py,
+            #                       torch.tensor(1, dtype=torch.int64))
+
+            #px_dummy = px_dummy.long()
+            #py_dummy = py_dummy.long()
+
+            answer_a = func1(preds, n, heatmap, px_dummy, py_dummy, k, poljot)
+            answer_b = func2(preds, n, heatmap, px_dummy, py_dummy, k, poljot)
+
+            again0 = torch.where(px > 1.,
+                                   1, 0)
+            again1 = torch.where(py > 1.,
+                                   1, 0)
+            again2 = torch.where(torch.gt(W - 1, px),
+                                   1, 0)
+            again3 = torch.where(torch.gt(H - 1, py),
+                                   1, 0)
+
+            poljot = torch.where((again0 + again1 + again2 + again3)>3,
+                                 answer_a,
+                                 answer_b)
+            # if 1 < px < W - 1 and 1 < py < H - 1:
+            #if op4:
+            #    poljot = answer_a
+            #else:
+            #    poljot = answer_b
 
         poljot = poljot.reshape(1, 16, 2)
 
         # Transform back to the image
-        ind_i = N-1
+        ind_i = N - 1
         outsize_t = torch.tensor([W, H])
 
         raketa = self._transform_preds(
@@ -291,6 +359,25 @@ class GetLandMarksNet(nn.Module):
         raketa = raketa.reshape(1, 16, 2)
 
         return raketa, maxvals
+
+    def _get_new_seven(self, point_a_t, point_b_t):
+        # https://stackoverflow.com/questions/21565994/method-to-return-the-equation-of-a-straight-line-given-two-points
+        from numpy import ones, vstack
+        from numpy.linalg import lstsq
+        point_a = point_a_t.numpy()
+        point_b = point_b_t.numpy()
+        points = [point_a, point_b]
+        x_coords, y_coords = zip(*points)
+        A = vstack([x_coords, ones(len(x_coords))]).T
+        m, c = lstsq(A, y_coords)[0]
+        new_y_height = abs(point_b[1] - point_a[1])
+        if point_b[1] > point_a[1]:
+            new_y = point_a[1] + new_y_height / 2.
+        else:
+            new_y = point_b[1] + new_y_height / 2.
+        new_x = (new_y - c) / m
+
+        return [np.round(new_x, 0), np.round(new_y, 0)]
 
     def _get_new_seven_alt(self, point_a_t, point_b_t):
         # https://stackoverflow.com/questions/21565994/method-to-return-the-equation-of-a-straight-line-given-two-points
@@ -313,7 +400,7 @@ class GetLandMarksNet(nn.Module):
                 n7 = self._get_new_seven_alt(out_land_alt[0, :].reshape(1, 2), out_land_alt[8, :].reshape(1, 2))
                 out_land = torch.cat((out_land, n7.reshape(1, 2)), 0)
             else:
-               out_land = torch.cat((out_land, input_landmarks[0][jj, :].reshape(1, 2)), 0)
+                out_land = torch.cat((out_land, input_landmarks[0][jj, :].reshape(1, 2)), 0)
 
         '''
         out_land_alt[7] = self._get_new_seven_alt(out_land_alt[0, :].reshape(1, 2), out_land_alt[8, :].reshape(1, 2))
@@ -338,8 +425,8 @@ class GetLandMarksNet(nn.Module):
 
         return predsh36m
 
-def build_custom_hrnet():
 
+def build_custom_hrnet():
     in_cnfg = methodspaths.methodsDict['hrnet_Paths'].cfg
     in_chckpnt = methodspaths.methodsDict['hrnet_Paths'].pth
     model = init_pose_model(in_cnfg, in_chckpnt, device='cpu')
@@ -371,7 +458,8 @@ class CustomHRNET(TopDown):
 
     @torch.no_grad()
     def customforward(self, img):
-        output = self.backbone(img)
+        img_n = torch.div(img, 255.)
+        output = self.backbone(img_n)
         if self.with_neck:
             output = self.neck(output)
         if self.with_keypoint:
@@ -380,9 +468,7 @@ class CustomHRNET(TopDown):
         return pose
 
 
-
 # ----------------------------------------------------------------------------------------------------------------
-
 
 
 x2 = methodspaths.methodsDict['gcn_Paths'].cfg
@@ -837,7 +923,7 @@ class GetPoseDetectionBBNN(nn.Module):
         valid_boxes = boxes[valid_score_mask]
         valid_cls_inds = cls_inds[valid_score_mask]
 
-        #keep = self.nms(valid_boxes, valid_scores, 0.45)
+        # keep = self.nms(valid_boxes, valid_scores, 0.45)
         keep = self._dummytokeep(valid_boxes, valid_scores, 0.45)
 
         dets_a = valid_boxes[keep, :]
@@ -857,8 +943,8 @@ class GetPoseDetectionBBNN(nn.Module):
 
         img_size = torch.tensor([640, 640])
 
-        #hsizes = [img_size[0] // stride for stride in strides]
-        #wsizes = [img_size[1] // stride for stride in strides]
+        # hsizes = [img_size[0] // stride for stride in strides]
+        # wsizes = [img_size[1] // stride for stride in strides]
         hsizes = [torch.div(img_size[0], stride, rounding_mode='trunc') for stride in strides]
         wsizes = [torch.div(img_size[1], stride, rounding_mode='trunc') for stride in strides]
 
@@ -970,8 +1056,8 @@ class GetPoseDetectionBBNN(nn.Module):
         flatten_bbox_preds = torch.cat(flatten_bbox_preds, dim=1)
         flatten_objectness = torch.cat(flatten_objectness, dim=1).sigmoid()
 
-        #scale_factors = torch.tensor([639./1000., 640./1002., 639./1000., 640./1002.])
-        #flatten_bbox_preds[..., :4] /= flatten_bbox_preds.new_tensor(
+        # scale_factors = torch.tensor([639./1000., 640./1002., 639./1000., 640./1002.])
+        # flatten_bbox_preds[..., :4] /= flatten_bbox_preds.new_tensor(
         #    scale_factors).unsqueeze(1)
 
         c = flatten_objectness.view(1, 8400, 1)

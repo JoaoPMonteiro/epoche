@@ -27,6 +27,31 @@ def another_2d_plot(in_point, in_img_width, in_img_height):
     plt.show(block=False)
 
 
+def another_2d_plot2(in_point):
+    X = in_point[:, 0]
+    X = np.append(X, -1)
+    X = np.append(X, -1)
+    X = np.append(X, 1)
+    X = np.append(X, 1)
+    Y = (-1) * in_point[:, 1]
+    Y = np.append(Y, 1)
+    Y = np.append(Y, -1)
+    Y = np.append(Y, 1)
+    Y = np.append(Y, -1)
+
+    nrpts = len(Y)-4
+    annotations = [str(ii) if ii < nrpts else '' for ii in range(len(X))]
+    plt.figure()
+    plt.scatter(X, Y, s=10, color="red")
+    plt.xlabel("X")
+    plt.ylabel("Y")
+
+    for i, label in enumerate(annotations):
+        plt.annotate(label, (X[i], Y[i]))
+
+    plt.show(block=False)
+
+
 def another_3d_plot(in_point):
     X = in_point[:, 0]
     Y = in_point[:, 1]
