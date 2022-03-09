@@ -11,3 +11,8 @@ mmcls==0.20.1
 mmtrack==0.10.0
 onnxruntime==1.10.0
 depthai==2.15.0.0
+wget==3.2
+gdown==4.4.0
+blobconverter==1.2.9
+tf2onnx==1.9.3
+onnx_tf==1.9.0

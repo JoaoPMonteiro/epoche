@@ -59,6 +59,8 @@ class CustomYOLOX(YOLOX):
         ab = self.decodeBB(outs)
         return ab
 
+        #return outs
+
 
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -231,7 +233,27 @@ class GetLandMarksNet(nn.Module):
         H = torch.tensor(64)
         W = torch.tensor(64)
 
+        #wally wally
         preds, maxvals = self._get_max_preds(heatmaps)
+        '''
+        preds= torch.tensor([[[33., 31.],
+         [43., 18.],
+         [57., 35.],
+         [60., 34.],
+         [54., 29.],
+         [60., 46.],
+         [58., 36.],
+         [57., 45.],
+         [58., 38.],
+         [54., 54.],
+         [36., 23.],
+         [62., 62.],
+         [58., 47.],
+         [59., 38.],
+         [40., 30.],
+         [32., 23.]]])
+        maxvals = torch.ones(1,16,1)
+        '''
 
         n = N - 1
         wally = torch.tensor([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
@@ -308,16 +330,18 @@ class GetLandMarksNet(nn.Module):
             #op3 = torch.cat((opone, optwo))
             #op4 = torch.all(op3, 0, keepdim=False)
 
-            backuptensor = torch.tensor(1, dtype=torch.int32)
+            #backuptensor = torch.tensor(1, dtype=torch.int32)
+            backuptensor = torch.tensor(1)
+            backuptensor = backuptensor.int()
 
-            px_dummy = torch.where(px > 1.,
+            px_dummy = torch.where(px.float() > 1.,
                                    px, backuptensor) #, dtype=torch.int32
-            px_dummy = torch.where(torch.gt(W - 1, px_dummy),
+            px_dummy = torch.where(torch.gt(W - 1, px_dummy.float()),
                                    px_dummy, backuptensor)
 
-            py_dummy = torch.where(py > 1.,
+            py_dummy = torch.where(py.float() > 1.,
                                    py, backuptensor)
-            py_dummy = torch.where(torch.gt(H - 1, py_dummy),
+            py_dummy = torch.where(torch.gt(H - 1, py_dummy.float()),
                                    py_dummy, backuptensor)
 
             #py_dummy = torch.where(op4 == torch.ones(1, dtype=torch.bool),
@@ -330,16 +354,17 @@ class GetLandMarksNet(nn.Module):
             answer_a = func1(preds, n, heatmap, px_dummy, py_dummy, k, poljot)
             answer_b = func2(preds, n, heatmap, px_dummy, py_dummy, k, poljot)
 
-            again0 = torch.where(px > 1.,
+            again0 = torch.where(px.float() > 1.,
                                    1, 0)
-            again1 = torch.where(py > 1.,
+            again1 = torch.where(py.float() > 1.,
                                    1, 0)
-            again2 = torch.where(torch.gt(W - 1, px),
+            again2 = torch.where(torch.gt(W - 1, px.float()),
                                    1, 0)
-            again3 = torch.where(torch.gt(H - 1, py),
+            again3 = torch.where(torch.gt(H - 1, py.float()),
                                    1, 0)
 
-            poljot = torch.where((again0 + again1 + again2 + again3)>3,
+            control_sum = again0 + again1 + again2 + again3
+            poljot = torch.where(control_sum>3.,
                                  answer_a,
                                  answer_b)
             # if 1 < px < W - 1 and 1 < py < H - 1:
@@ -359,7 +384,7 @@ class GetLandMarksNet(nn.Module):
         raketa = raketa.reshape(1, 16, 2)
 
         return raketa, maxvals
-
+    '''
     def _get_new_seven(self, point_a_t, point_b_t):
         # https://stackoverflow.com/questions/21565994/method-to-return-the-equation-of-a-straight-line-given-two-points
         from numpy import ones, vstack
@@ -378,7 +403,7 @@ class GetLandMarksNet(nn.Module):
         new_x = (new_y - c) / m
 
         return [np.round(new_x, 0), np.round(new_y, 0)]
-
+    '''
     def _get_new_seven_alt(self, point_a_t, point_b_t):
         # https://stackoverflow.com/questions/21565994/method-to-return-the-equation-of-a-straight-line-given-two-points
         point_a_t = point_a_t.reshape(1, 2)
@@ -421,10 +446,35 @@ class GetLandMarksNet(nn.Module):
         c[0] = center[0]
         s = torch.tensor([[256.0 / 200, 256.0 / 200]], dtype=torch.float32)
         preds, maxvals = self._keypoints_from_heatmaps(heatmaps, c, s)
-        predsh36m = self._reorder_landmarks(preds)
+        #asd = heatmaps.size()
 
-        return predsh36m
+        '''
+        for i in range(17):
+            probe = heatmaps[0, i, :, :]
+            values, index = torch.max(probe,0)
+            wally = 'here'
 
+        preds= torch.tensor([[[33., 13.],
+         [43., 18.],
+         [57., 35.],
+         [60., 34.],
+         [54., 29.],
+         [60., 46.],
+         [58., 36.],
+         [57., 45.],
+         [58., 38.],
+         [54., 54.],
+         [36., 23.],
+         [62., 62.],
+         [58., 47.],
+         [59., 38.],
+         [40., 30.],
+         [32., 23.]]])
+        #predsh36m = self._reorder_landmarks(preds)
+
+        #return predsh36m
+        '''
+        return preds
 
 def build_custom_hrnet():
     in_cnfg = methodspaths.methodsDict['hrnet_Paths'].cfg
@@ -466,6 +516,7 @@ class CustomHRNET(TopDown):
             output = self.keypoint_head(output)
         pose = self.decodeHM(output)
         return pose
+        #return output
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -887,6 +938,49 @@ class GetPoseDetectionBBNN(nn.Module):
 
         return keep
 
+    def _add_dummy_dets(self, _boxes, _scores):
+        left = torch.tensor([320.0, 320.0, 540.0, 540.0]).reshape(1, 4)
+        right_1 = torch.tensor([0.46]).reshape(1, 1)
+        right_2 = torch.zeros(1, 79)
+        right = torch.cat((right_1, right_2), 1)
+
+        _left = torch.tensor([0.0, 0.0, 640.0, 640.0]).reshape(1, 4)
+        _right_1 = torch.tensor([0.47]).reshape(1, 1)
+        _right_2 = torch.zeros(1, 79)
+        _right = torch.cat((_right_1, _right_2), 1)
+
+        boxes__ = torch.cat((_boxes, _left), 0)
+        scores__ = torch.cat((_scores, _right), 0)
+
+        boxes = torch.cat((boxes__, left), 0)
+        scores = torch.cat((scores__, right), 0)
+        return boxes, scores
+
+    def _get_valid(self, boxes, scores):
+        score_thr = 0.1
+        cls_inds = scores.argmax(1)
+        #sind = len(cls_inds)
+        #icat = cls_inds.shape[0]
+        cls_scores = scores[torch.arange(cls_inds.shape[0]), cls_inds]
+
+        valid_score_mask = cls_scores > score_thr
+
+        valid_scores = cls_scores[valid_score_mask]
+        valid_boxes = boxes[valid_score_mask]
+        valid_cls_inds = cls_inds[valid_score_mask]
+
+        return valid_scores, valid_boxes, valid_cls_inds
+
+    def _get_sorted(self, _valid_scores, _valid_boxes, _valid_cls_inds):
+        keep = torch.sort(_valid_scores, descending=True)[1]
+
+        dets_a = _valid_boxes[keep, :]
+        dets_b = _valid_scores[keep, None]
+        dets_c = _valid_cls_inds[keep, None].float()
+        dets = torch.cat((dets_a, dets_b, dets_c), 1)
+
+        return dets
+
     def _multiclass_nms_class_agnostic(self, _boxes, _scores):
         """
         Multiclass NMS implemented in Numpy. Class-agnostic version.
@@ -915,7 +1009,9 @@ class GetPoseDetectionBBNN(nn.Module):
         scores = torch.cat((scores__, right), 0)
 
         cls_inds = scores.argmax(1)
-        cls_scores = scores[torch.arange(len(cls_inds)), cls_inds]
+        #sind = len(cls_inds)
+        #icat = cls_inds.shape[0]
+        cls_scores = scores[torch.arange(cls_inds.shape[0]), cls_inds]
 
         valid_score_mask = cls_scores > score_thr
 
@@ -924,7 +1020,8 @@ class GetPoseDetectionBBNN(nn.Module):
         valid_cls_inds = cls_inds[valid_score_mask]
 
         # keep = self.nms(valid_boxes, valid_scores, 0.45)
-        keep = self._dummytokeep(valid_boxes, valid_scores, 0.45)
+        #keep = self._dummytokeep(valid_boxes, valid_scores, 0.45)
+        keep = torch.sort(valid_scores, descending=True)[1]
 
         dets_a = valid_boxes[keep, :]
         dets_b = valid_scores[keep, None]
@@ -945,13 +1042,22 @@ class GetPoseDetectionBBNN(nn.Module):
 
         # hsizes = [img_size[0] // stride for stride in strides]
         # wsizes = [img_size[1] // stride for stride in strides]
-        hsizes = [torch.div(img_size[0], stride, rounding_mode='trunc') for stride in strides]
-        wsizes = [torch.div(img_size[1], stride, rounding_mode='trunc') for stride in strides]
+        #hsizes = torch.tensor([torch.div(img_size[0], stride, rounding_mode='trunc') for stride in strides])
+        #wsizes = torch.tensor([torch.div(img_size[1], stride, rounding_mode='trunc') for stride in strides])
+        hsizes = torch.tensor([torch.div(img_size[0], strides[0], rounding_mode='trunc'),
+                               torch.div(img_size[0], strides[1], rounding_mode='trunc'),
+                               torch.div(img_size[0], strides[2], rounding_mode='trunc')])
+        wsizes = torch.tensor([torch.div(img_size[1], strides[0], rounding_mode='trunc'),
+                               torch.div(img_size[1], strides[1], rounding_mode='trunc'),
+                               torch.div(img_size[1], strides[2], rounding_mode='trunc')])
 
-        shapes_hard = [torch.ones(1, 6400), torch.ones(1, 1600), torch.ones(1, 400)]
+        #shapes_hard = [torch.ones(1, 6400), torch.ones(1, 1600), torch.ones(1, 400)]
+        shapes_hard_0 = torch.ones(1, 6400)
+        shapes_hard_1 = torch.ones(1, 1600)
+        shapes_hard_2 = torch.ones(1, 400)
 
         # iter zero
-        hsize0, wsize0, stride0, shapeF0 = hsizes[0], wsizes[0], strides[0], shapes_hard[0]
+        hsize0, wsize0, stride0, shapeF0 = hsizes[0], wsizes[0], strides[0], shapes_hard_0
         xv0, yv0 = torch.meshgrid(torch.arange(wsize0), torch.arange(hsize0))
         xv0 = torch.permute(xv0, (1, 0))
         yv0 = torch.permute(yv0, (1, 0))
@@ -962,7 +1068,7 @@ class GetPoseDetectionBBNN(nn.Module):
         expanded_strides = badu0
 
         # iter one
-        hsize1, wsize1, stride1, shapeF1 = hsizes[1], wsizes[1], strides[1], shapes_hard[1]
+        hsize1, wsize1, stride1, shapeF1 = hsizes[1], wsizes[1], strides[1], shapes_hard_1
         xv1, yv1 = torch.meshgrid(torch.arange(wsize1), torch.arange(hsize1))
         xv1 = torch.permute(xv1, (1, 0))
         yv1 = torch.permute(yv1, (1, 0))
@@ -973,7 +1079,7 @@ class GetPoseDetectionBBNN(nn.Module):
         expanded_strides = torch.cat((expanded_strides, badu1), 1)
 
         # iter teo
-        hsize2, wsize2, stride2, shapeF2 = hsizes[2], wsizes[2], strides[2], shapes_hard[2]
+        hsize2, wsize2, stride2, shapeF2 = hsizes[2], wsizes[2], strides[2], shapes_hard_2
         xv2, yv2 = torch.meshgrid(torch.arange(wsize2), torch.arange(hsize2))
         xv2 = torch.permute(xv2, (1, 0))
         yv2 = torch.permute(yv2, (1, 0))
@@ -989,6 +1095,50 @@ class GetPoseDetectionBBNN(nn.Module):
         outs_2 = torch.cat((outs_alpha, outs_beta, outs_gamma), 2)
 
         return outs_2
+
+    def _get_person(self, in_dets):
+        final_boxes, final_scores, final_cls_inds = in_dets[:, :4], in_dets[:, 4], in_dets[:, 5]
+
+        #ref_value = torch.zeros(final_cls_inds.shape[0], final_cls_inds.shape[1])
+        #ref_value = torch.tensor([0.0])
+        ref_value = 0
+        probe_tensor = final_cls_inds.int()
+        probe_eq = torch.eq(probe_tensor, ref_value)
+        wpeople = probe_eq.nonzero()
+        #wpeople = (final_cls_inds == 0.0).nonzero()
+        #wpeople = (final_cls_inds == 0.0)
+        #wpeoplealt = torch.where(final_cls_inds == 0.0, 1, 0)
+
+        people = wpeople[0]
+
+        lout = final_boxes[people]
+
+        fso = final_scores[people].reshape(1, 1)
+        lout = torch.cat((lout, fso), 1)
+
+        return lout
+
+    def _getbboxes(self, in_predictions):
+        ratio = torch.tensor([1.0])
+        boxes = in_predictions[:, :4]
+        scores = in_predictions[:, 4:5] * in_predictions[:, 5:]
+
+        boxes_xyxy_a = boxes[:, 0] - boxes[:, 2] / 2.
+        boxes_xyxy_a = boxes_xyxy_a.reshape(boxes.shape[0], 1)
+
+        boxes_xyxy_b = boxes[:, 1] - boxes[:, 3] / 2.
+        boxes_xyxy_b = boxes_xyxy_b.reshape(boxes.shape[0], 1)
+
+        boxes_xyxy_c = boxes[:, 0] + boxes[:, 2] / 2.
+        boxes_xyxy_c = boxes_xyxy_c.reshape(boxes.shape[0], 1)
+
+        boxes_xyxy_d = boxes[:, 1] + boxes[:, 3] / 2.
+        boxes_xyxy_d = boxes_xyxy_d.reshape(boxes.shape[0], 1)
+
+        boxes_xyxy = torch.cat((boxes_xyxy_a, boxes_xyxy_b, boxes_xyxy_c, boxes_xyxy_d), 1)
+        boxes_xyxy /= ratio
+
+        return boxes_xyxy, scores
 
     def _postprocess_results_yolox(self, in_data):
         """
@@ -1024,6 +1174,8 @@ class GetPoseDetectionBBNN(nn.Module):
         final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
 
         wpeople = (final_cls_inds == 0.0).nonzero()
+        #wpeople = (final_cls_inds == 0.0)
+        #wpeoplealt = torch.where(final_cls_inds == 0.0, 1, 0)
 
         people = wpeople[0]
 
@@ -1063,4 +1215,14 @@ class GetPoseDetectionBBNN(nn.Module):
         c = flatten_objectness.view(1, 8400, 1)
         ab = torch.cat((flatten_bbox_preds, c), 2)
         ab = torch.cat((ab, flatten_cls_scores), 2)
-        return self._postprocess_results_yolox(ab)
+        predictions = self._demo_postprocess(ab)[0]
+        boxes_xyxy, scores = self._getbboxes(predictions)
+        boxes_xyxy, scores = self._add_dummy_dets(boxes_xyxy, scores)
+        valid_scores, valid_boxes, valid_cls_inds = self._get_valid(boxes_xyxy, scores)
+        sorted_dets = self._get_sorted(valid_scores, valid_boxes, valid_cls_inds)
+
+        out_p = self._get_person(sorted_dets)
+        #dets = self._multiclass_nms_class_agnostic(boxes_xyxy, scores)
+        #return self._postprocess_results_yolox(ab)
+        #return ab
+        return out_p
